@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# Temporarily store uncommited changes
+git stash
+
+# Verify correct branch
+git checkout develop
+
+# Build new files
+stack exec site clean
+stack build
+stack exec site build
+
+# Get previous files
+git fetch --all
+git checkout -b master --track origin/master
+
+# Overwrite existing files with new files
+cp -a _site/. .
+
+# Commit
+git add -A
+git commit -m "publish $(date -u)"
+
+# Verify
+git diff HEAD^1
+echo "Verify your changes before pushing!"
+echo "If something is wrong, return to original state by running:"
+echo "git checkout develop"
+echo "git branch -D master"
+echo "git stash pop"
