@@ -1,7 +1,9 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
 import           Data.Monoid (mappend)
+import qualified Data.Set as S
 import           Hakyll
+import           Text.Pandoc.Options
 
 
 --------------------------------------------------------------------------------
@@ -23,7 +25,7 @@ main = hakyllWith defaultConfiguration { deployCommand = "./deploy" } $ do
 
     match "posts/*" $ do
         route $ setExtension "html"
-        compile $ pandocCompiler
+        compile $ postPandocCompiler
             >>= loadAndApplyTemplate "templates/post.html"    postCtx
             >>= loadAndApplyTemplate "templates/default.html" postCtx
             >>= relativizeUrls
@@ -63,3 +65,13 @@ postCtx :: Context String
 postCtx =
     dateField "date" "%B %e, %Y" `mappend`
     defaultContext
+
+postPandocCompiler :: Compiler (Item String)
+postPandocCompiler =
+    let customExtensions = [Ext_grid_tables]
+        defaultExtensions = writerExtensions defaultHakyllWriterOptions
+        newExtensions = foldr S.insert defaultExtensions customExtensions
+        writerOptions = defaultHakyllWriterOptions {
+                          writerExtensions = newExtensions
+                        }
+    in pandocCompilerWith defaultHakyllReaderOptions writerOptions
