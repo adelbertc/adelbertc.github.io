@@ -52,19 +52,20 @@ Here are some basic commands to get started with Nix. You may want
 to run `nix-channel --update` before to make sure you have
 the latest set of packages. Nix channels will be discussed later in this post.
 
-+---------------------+-----------------------------------------------------------+
-| Command             | Description                                               |
-+:====================+:==========================================================+
-| `nix-env -qa [pkg]` | Check to see if [pkg] is available through Nix            |
-+---------------------+-----------------------------------------------------------+
-| `nix-env -i [pkg]`  | Install [pkg]                                             |
-+---------------------+-----------------------------------------------------------+
-| `nix-env -u [pkg]`  | Update [pkg]. We can add `--dry-run` to see what would    |
-|                     | be installed without actually updating if we're nervous.  |
-+---------------------+-----------------------------------------------------------+
-| `nix-env -e [pkg]`  | "Uninstalls" [pkg] - read the next section to learn what  |
-|                     | actually happens when we uninstall a package.             |
-+---------------------+-----------------------------------------------------------+
++----------------------+-----------------------------------------------------------+
+| Command              | Description                                               |
++:=====================+:==========================================================+
+| `nix-env -qaP [pkg]` | Check to see if [pkg] is available through Nix, showing   |
+|                      | its Nix attribute path if available                       |
++----------------------+-----------------------------------------------------------+
+| `nix-env -iA [attr]` | Install a package by its attribute path                   |
++----------------------+-----------------------------------------------------------+
+| `nix-env -u [pkg]`   | Update [pkg]. We can add `--dry-run` to see what would    |
+|                      | be installed without actually updating if we're nervous.  |
++----------------------+-----------------------------------------------------------+
+| `nix-env -e [pkg]`   | "Uninstalls" [pkg] - read the next section to learn what  |
+|                      | actually happens when we uninstall a package.             |
++----------------------+-----------------------------------------------------------+
 
 Please refer to the [Nix manual][nixManual] for more information on these commands.
 
@@ -217,6 +218,9 @@ ad-hoc, informally-written, bug-ridden copy of the
 [Nix by example: The Nix expression language][nixByExample][^5]. If you're
 interested in learning about Nix the language, I would recommend reading those.
 
+I have also been told by several people that the [Nix pill][nixPill] series is
+very good. I've yet to read it myself, but it's definitely on my to-read list.
+
 ### Nixpkgs
 
 [Nixpkgs][nixpkgs] is the primary way of installing packages through Nix. Nixpkgs
@@ -263,6 +267,7 @@ Here are some resources I found valuable when learning Nix.
 [nixExpressions]: http://nixos.org/nix/manual/#chap-writing-nix-expressions
 [nixInstall]: http://nixos.org/nix/manual/#chap-installation
 [nixManual]: http://nixos.org/nix/manual/
+[nixPill]: http://lethalman.blogspot.com/2014/07/nix-pill-1-why-you-should-give-it-try.html
 [nixpkgs]: http://nixos.org/nixpkgs/
 [nixpkgsManual]: http://nixos.org/nixpkgs/manual/
 [pflwNixOs]: https://begriffs.com/posts/2016-08-08-intro-to-nixos.html
