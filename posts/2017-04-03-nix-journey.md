@@ -56,9 +56,9 @@ the latest set of packages. Nix channels will be discussed later in this post.
 | Command              | Description                                               |
 +:=====================+:==========================================================+
 | `nix-env -qaP [pkg]` | Check to see if [pkg] is available through Nix, showing   |
-|                      | its Nix attribute path if available                       |
+|                      | its Nix attribute path if available.                      |
 +----------------------+-----------------------------------------------------------+
-| `nix-env -iA [attr]` | Install a package by its attribute path                   |
+| `nix-env -iA [attr]` | Install a package by its attribute path [attr].           |
 +----------------------+-----------------------------------------------------------+
 | `nix-env -u [pkg]`   | Update [pkg]. We can add `--dry-run` to see what would    |
 |                      | be installed without actually updating if we're nervous.  |
