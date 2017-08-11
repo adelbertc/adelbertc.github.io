@@ -110,7 +110,7 @@ the argument must either be `False` or `True`.
 
 -- a = True
   = ... index (f (index (Pair x y) True)) True
-  = ... index (f y) True -- definition of Pair's index = to
+  = ... index (f y) True  -- definition of Pair's index = to
   = second element of f y -- definition of Pair's index = to
 ```
 
