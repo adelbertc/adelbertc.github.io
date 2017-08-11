@@ -97,37 +97,38 @@ That matches our `return` definition above. Now let's do the same for `bindRep`:
 bindRep :: Pair a -> (a -> Pair b) -> Pair b
 bindRep (Pair x y) f
   = tabulate (\a -> index (f (index (Pair x y) a)) a)
+  = tabulate g              -- call the lambda 'g'
+  = Pair (g False) (g True) -- definition of Pair's tabulate = from
 ```
 
-Here we can do a sort of case splitting since we know `a = Bool` and therefore
-the argument must either be `False` or `True`.
+Now substituting `False` and `True` into the lambda:
 
 ```haskell
--- a = False
-  = ... index (f (index (Pair x y) False)) False
-  = ... index (f x) False -- definition of Pair's index = to
+-- g False
+  = index (f (index (Pair x y) False)) False
+  = index (f x) False     -- definition of Pair's index = to
   = first element of f x  -- definition of Pair's index = to
 
--- a = True
-  = ... index (f (index (Pair x y) True)) True
-  = ... index (f y) True  -- definition of Pair's index = to
+-- g True
+  = index (f (index (Pair x y) True)) True
+  = index (f y) True      -- definition of Pair's index = to
   = second element of f y -- definition of Pair's index = to
 ```
 
-This tells us passing `False` to the function gives the first element of `f x`, and passing
-`True` to the function gives the second element of `f y`. Thus:
+Thus:
 
 ```haskell
-joinP :: Pair (Pair a) -> Pair a
-joinP (Pair (Pair a _) (Pair _ d)) = Pair a d
---           ^ f x      ^ f y
+bindRep (Pair x y) f
+  = Pair a d -- where Pair (Pair a _) (Pair _ d)
+--                          ^ f x      ^ f y
 ```
 
-That's awesome.
+The same as `joinP` above.
 
-Now while I started with a `Monad` instance and worked my way back, the more useful pattern is to think about
-the [denotation][denotationalDesign] of your data type and work your way forward. In the case of `Pair`, Conal
-identified it as an instance of a representable functor and from there a `Monad` instance was revealed.
+This is awesome. By starting with the *meaning* of his data type, Conal discovered the only
+natural type class instance consistent with the meaning. While in this case I started with the instance and worked
+my way back, I believe the more useful and consistent approach is to think hard about your data type's
+[denotation][denotationalDesign] and work your way forward.
 
 [denotationalDesign]: http://conal.net/papers/type-class-morphisms/
 [representableHackage]: https://hackage.haskell.org/package/representable-functors
