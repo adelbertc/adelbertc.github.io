@@ -98,7 +98,7 @@ bindRep :: Pair a -> (a -> Pair b) -> Pair b
 bindRep (Pair x y) f
   = tabulate (\a -> index (f (index (Pair x y) a)) a)
   = tabulate g              -- call the lambda 'g'
-  = Pair (g False) (g True) -- definition of Pair's tabulate = from
+  = Pair (g False) (g True) -- Pair's tabulate = from
 ```
 
 Now substituting `False` and `True` into the lambda:
@@ -106,13 +106,13 @@ Now substituting `False` and `True` into the lambda:
 ```haskell
 -- g False
   = index (f (index (Pair x y) False)) False
-  = index (f x) False     -- definition of Pair's index = to
-  = first element of f x  -- definition of Pair's index = to
+  = index (f x) False     -- Pair's index = to
+  = first element of f x  -- Pair's index = to
 
 -- g True
   = index (f (index (Pair x y) True)) True
-  = index (f y) True      -- definition of Pair's index = to
-  = second element of f y -- definition of Pair's index = to
+  = index (f y) True      -- Pair's index = to
+  = second element of f y -- Pair's index = to
 ```
 
 Thus:
