@@ -182,7 +182,7 @@ boot.initrd.luks.devices = [
 ];
 ```
 
-When I first did this I just put my `<lvm partition>` name under `device`, something like `device = /dev/sda2`. After I
+When I first did this I just put my LVM partition name under `device`, something like `device = /dev/sda2`. After I
 shut down my computer, reconnected my other hard drive, and rebooted my machine, NixOS complained about `/dev/sda2`
 being wonky. Apparently the names assigned to drives can vary across boots, and it's not surprising connecting another
 drive can mess with how names are chosen. Therefore instead of referring to the root filesystem by name in the
