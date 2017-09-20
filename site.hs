@@ -9,6 +9,10 @@ import           Text.Pandoc.Options
 --------------------------------------------------------------------------------
 main :: IO ()
 main = hakyllWith defaultConfiguration { deployCommand = "./deploy" } $ do
+    match "publications/*" $ do
+        route   idRoute
+        compile copyFileCompiler
+
     match "images/*" $ do
         route   idRoute
         compile copyFileCompiler
