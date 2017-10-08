@@ -9,16 +9,20 @@ git stash
 git checkout develop
 
 # Build new files
-stack exec site clean
-stack build
-stack exec site build
+nix-build
 
 # Get previous files
 git fetch --all
 git checkout -b master --track origin/master
 
 # Overwrite existing files with new files
-cp -a _site/. .
+cp -a result/. .
+
+# /nix/store files are owned by root, chown them
+# back to my user so that say, Git, doesn't freak out
+my_user=$(whoami)
+chown -R ${my_user} .
+chmod -R 744 .
 
 # Commit
 git add -A

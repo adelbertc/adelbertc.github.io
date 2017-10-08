@@ -28,6 +28,7 @@ cabal.project.local
 _cache/
 _site/
 .stack-work/
+result
 
 ##########
 # Mac OS #
