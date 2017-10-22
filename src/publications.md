@@ -4,7 +4,7 @@ title: Publications
 
 ### Papers
 
-[The Limitations of Type Classes as Subtyped Implicits](/publications/typeclasses-scala17.pdf), ACM SCALA 2017.
+[The Limitations of Type Classes as Subtyped Implicits](/publications/typeclasses-scala17.pdf), ACM SCALA 2017. [[Slides]](https://speakerdeck.com/adelbertc/the-limitations-of-type-classes-as-subtyped-implicits)
 
 ### Talks
 
