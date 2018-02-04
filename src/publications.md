@@ -8,6 +8,10 @@ title: Publications
 
 ### Talks
 
+Persistent Data Structures in System Design, Easy Bay Haskell Meetup, January 2018. [[Slides]](https://speakerdeck.com/adelbertc/persistent-data-structures-in-system-design) [[Video]](https://www.youtube.com/watch?v=exepvX_XnlM&feature=youtu.be&t=2m46s)
+
+The Functor, Applicative, Monad talk, Scale by the Bay 2017. [[Slides]](https://speakerdeck.com/adelbertc/the-functor-applicative-monad-talk) [[Video]](https://youtu.be/L0aYcq1tqMo)
+
 Simplicity in composition, Scala World 2017. [[Slides]](https://speakerdeck.com/adelbertc/simplicity-in-composition)
 
 All About Applicative, BayHac 2017. [[Repo]](https://github.com/adelbertc/bayhac17) [[Video]](https://www.youtube.com/watch?v=Mn7BtPALFys&t=793s)
