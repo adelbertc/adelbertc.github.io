@@ -78,10 +78,8 @@ postCtx =
 
 postPandocCompiler :: Compiler (Item String)
 postPandocCompiler =
-    let customExtensions = [Ext_grid_tables]
-        defaultExtensions = writerExtensions defaultHakyllWriterOptions
-        newExtensions = foldr S.insert defaultExtensions customExtensions
+    let defaultExtensions = writerExtensions defaultHakyllWriterOptions
         writerOptions = defaultHakyllWriterOptions {
-                          writerExtensions = newExtensions
+                          writerExtensions = enableExtension Ext_grid_tables defaultExtensions
                         }
     in pandocCompilerWith defaultHakyllReaderOptions writerOptions
