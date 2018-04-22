@@ -37,6 +37,7 @@ main = hakyllWith defaultConfiguration { deployCommand = "./deploy" } $ do
         route $ setExtension "html"
         compile $ postPandocCompiler
             >>= loadAndApplyTemplate "templates/post.html"    postCtx
+            >>= saveSnapshot "content"
             >>= loadAndApplyTemplate "templates/default.html" postCtx
             >>= relativizeUrls
 
@@ -70,6 +71,14 @@ main = hakyllWith defaultConfiguration { deployCommand = "./deploy" } $ do
 
     match "templates/*" $ compile templateBodyCompiler
 
+    create ["feed.xml"] $ do
+        route idRoute
+        compile $ do
+            let feedCtx = postCtx `mappend` bodyField "description"
+            posts <- fmap (take 10) . recentFirst =<<
+                loadAllSnapshots "posts/*" "content"
+            renderAtom feedConfiguration feedCtx posts
+
 --------------------------------------------------------------------------------
 postCtx :: Context String
 postCtx =
@@ -83,3 +92,12 @@ postPandocCompiler =
                           writerExtensions = enableExtension Ext_grid_tables defaultExtensions
                         }
     in pandocCompilerWith defaultHakyllReaderOptions writerOptions
+
+feedConfiguration :: FeedConfiguration
+feedConfiguration = FeedConfiguration
+  { feedTitle       = "Finally Reified"
+  , feedDescription = "Functional programming ∩ systems design."
+  , feedAuthorName  = "Adelbert Chang"
+  , feedAuthorEmail = ""
+  , feedRoot        = "https://adelbertc.github.io"
+  }
