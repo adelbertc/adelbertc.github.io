@@ -8,29 +8,31 @@ title: Publications
 
 ### Talks
 
+Nelson: Functional programming in system design, NEScala 2018 and Scala Taiwan #23. [[Slides]](https://speakerdeck.com/adelbertc/nelson-functional-programming-in-system-design) [[Video]](https://youtu.be/t8KRo-DXnEo)
+
 Persistent Data Structures in System Design, Easy Bay Haskell Meetup, January 2018. [[Slides]](https://speakerdeck.com/adelbertc/persistent-data-structures-in-system-design) [[Video]](https://www.youtube.com/watch?v=exepvX_XnlM&feature=youtu.be&t=2m46s)
 
 The Functor, Applicative, Monad talk, Scale by the Bay 2017. [[Slides]](https://speakerdeck.com/adelbertc/the-functor-applicative-monad-talk) [[Video]](https://youtu.be/L0aYcq1tqMo)
 
 Simplicity in composition, Scala World 2017. [[Slides]](https://speakerdeck.com/adelbertc/simplicity-in-composition)
 
-All About Applicative, BayHac 2017. [[Repo]](https://github.com/adelbertc/bayhac17) [[Video]](https://www.youtube.com/watch?v=Mn7BtPALFys&t=793s)
+All About Applicative, BayHac 2017. [[Repo]](https://github.com/adelbertc/bayhac17) [[Video]](https://youtu.be/Mn7BtPALFys)
 
-Let the Scala compiler work for you, Typelevel Summit 2017. [[Slides]](https://speakerdeck.com/adelbertc/let-the-scala-compiler-work-with-you) [[Video]](https://www.youtube.com/watch?v=zbGiOcSeq1Y)
+Let the Scala compiler work for you, Typelevel Summit 2017. [[Slides]](https://speakerdeck.com/adelbertc/let-the-scala-compiler-work-with-you) [[Video]](https://youtu.be/zbGiOcSeq1Y)
 
 [Functional Geekery Episode 86](https://www.functionalgeekery.com/episode-86-adelbert-chang/), March 2017.
 
-Spoiler by higher-kinded types, Scalae by the Bay 2016. [[Slides]](https://speakerdeck.com/adelbertc/spoiled-by-higher-kinded-types) [[Video]](https://www.youtube.com/watch?v=t7bOKAIQG4Q)
+Spoiler by higher-kinded types, Scalae by the Bay 2016. [[Slides]](https://speakerdeck.com/adelbertc/spoiled-by-higher-kinded-types) [[Video]](https://youtu.be/t7bOKAIQG4Q)
 
-Checked complexity with typed simplicits, NEScala 2016. [[Slides]](https://speakerdeck.com/adelbertc/checked-complexity-with-typed-simplicity) [[Video]](https://www.youtube.com/watch?v=FmYYTRn6WLk)
+Checked complexity with typed simplicity, NEScala 2016. [[Slides]](https://speakerdeck.com/adelbertc/checked-complexity-with-typed-simplicity) [[Video]](https://youtu.be/FmYYTRn6WLk)
 
-Becoming a cat(s) person, Typelevel Summit 2016. [[Video]](https://www.youtube.com/watch?v=1SQ87E4Qarg&t=2s)
+Becoming a cat(s) person, Typelevel Summit 2016. [[Video]](https://youtu.be/1SQ87E4Qarg)
 
-Why I Like Functional Programming, LambdaConf 2015. [[Slides]](https://speakerdeck.com/adelbertc/why-i-like-functional-programming) [[Video]](https://www.youtube.com/watch?v=tsHQEB_ftxc)
+Why I Like Functional Programming, LambdaConf 2015. [[Slides]](https://speakerdeck.com/adelbertc/why-i-like-functional-programming) [[Video]](https://youtu.be/tsHQEB_ftxc)
 
-Reasoning with Types, Scala by the Bay 2014. [[Slides]](https://speakerdeck.com/adelbertc/reasoning-with-types) [[Video]](https://www.youtube.com/watch?v=TbASMeJSh9s)
+Reasoning with Types, Scala by the Bay 2014. [[Slides]](https://speakerdeck.com/adelbertc/reasoning-with-types) [[Video]](https://youtu.be/TbASMeJSh9s)
 
-Distributed Graph Processing with Scala and Akka, Silicon Valley Scala Symposium 2013. [[Slides]](https://speakerdeck.com/adelbertc/distributed-graph-processing-with-scala-and-akka-svss-13) [[Video]](https://www.youtube.com/watch?v=tSDytuXasdw)
+Distributed Graph Processing with Scala and Akka, Silicon Valley Scala Symposium 2013. [[Slides]](https://speakerdeck.com/adelbertc/distributed-graph-processing-with-scala-and-akka-svss-13) [[Video]](https://youtu.be/tSDytuXasdw)
 
 ### External blog posts
 
