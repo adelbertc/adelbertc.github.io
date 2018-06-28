@@ -142,7 +142,7 @@ on top.
    used and I'm paranoid.
 4. `pvcreate /dev/mapper/enc-pv` to create a physical volume on the partition.
 5. `vgcreate vg /dev/mapper/enc-pv` to create a volume group.
-6. `lvcreate -L <# of GB of swap space you want>G swap vg` to create swap space. I wasn't sure how much to put here
+6. `lvcreate -L <# of GB of swap space you want>G -n swap vg` to create swap space. I wasn't sure how much to put here
    and some preliminary searching led to long arguments about why an apparently old rule of 2 x (amount of RAM) is no
    longer necessary. I was lazy so I just put 16G, but you may want to put more thought into this than I.
 7. `lvcreate -l '100%FREE' -n root vg` to allocate the rest of the partition for your root filesystem.
@@ -176,7 +176,7 @@ Finally, let's generate the NixOS configuration files and get this show on the r
 boot.initrd.luks.devices = [
   {
     name = "root";
-    device = /dev/disk/by-uuid/<the aforementioned UUID here>;
+    device = "/dev/disk/by-uuid/<the aforementioned UUID here>";
     preLVM = true;
   }
 ];
