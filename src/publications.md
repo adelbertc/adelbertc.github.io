@@ -14,7 +14,7 @@ Persistent Data Structures in System Design, Easy Bay Haskell Meetup, January 20
 
 The Functor, Applicative, Monad talk, Scale by the Bay 2017. [[Slides]](https://speakerdeck.com/adelbertc/the-functor-applicative-monad-talk) [[Video]](https://youtu.be/L0aYcq1tqMo)
 
-Simplicity in composition, Scala World 2017. [[Slides]](https://speakerdeck.com/adelbertc/simplicity-in-composition)
+Simplicity in composition, Scala World 2017. [[Slides]](https://speakerdeck.com/adelbertc/simplicity-in-composition) [[Video]](https://youtu.be/XV0o-hy1WUM)
 
 All About Applicative, BayHac 2017. [[Repo]](https://github.com/adelbertc/bayhac17) [[Video]](https://youtu.be/Mn7BtPALFys)
 
