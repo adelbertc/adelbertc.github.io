@@ -1,37 +1,33 @@
-# Nix build for my blog, copied and adapated from:
-#   https://utdemir.com/posts/hakyll-on-nixos.html
-#   http://www.cs.yale.edu/homes/lucas.paul/posts/2017-04-10-hakyll-on-nix.html
-
-{ pkgs ? import <nixpkgs> { } }:
-
 let
+  pkgs = import ((import <nixpkgs> { }).fetchFromGitHub {
+    owner  = "NixOS";
+    repo   = "nixpkgs";
+    rev    = "43d3e539c5cd3b0ce0d08ca1b17831146da81a5f";
+    sha256 = "03r2ddpk2v17sc0742kdfnlj8sn5l60vz8a03ryiqsk5hkwn8cbv";
+  }) { };
+
   stdenv = pkgs.stdenv;
-  darwinDeps = if stdenv.isDarwin then [ pkgs.darwin.apple_sdk.frameworks.Cocoa ] else [];
+  lib    = pkgs.lib;
 
-  # Name of build and executable for the Hakyll site generator
-  generateMySiteName = "generateMySite";
-
-  generateMySite = stdenv.mkDerivation {
-    name        = generateMySiteName;
-    src         = ./generator;
-    phases      = "unpackPhase buildPhase";
+  generator = stdenv.mkDerivation {
+    name = "adelbertc.github.io-generator";
+    src = lib.cleanSource ./generator;
     buildInputs = [
-      (pkgs.haskellPackages.ghcWithPackages (haskellPkgs: [ haskellPkgs.hakyll ]))
-    ] ++ darwinDeps;
-    buildPhase  = ''
-      mkdir -p $out/bin
-      ghc -O2 --make site.hs -o $out/bin/${generateMySiteName}
+      (pkgs.haskellPackages.ghcWithPackages (hpkgs: with hpkgs; [ hakyll ]))
+    ] ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.Cocoa;
+    phases = "unpackPhase buildPhase";
+    buildPhase = ''
+      ghc -O2 --make site.hs -o $out
     '';
   };
 in
   stdenv.mkDerivation {
-    name        = "my-site";
-    src         = ./src;
-    phases      = "unpackPhase buildPhase";
-    buildInputs = [ generateMySite ];
-    buildPhase  = ''
-      ${generateMySiteName} build
-      mkdir $out
+    name = "adelbertc.github.io";
+    src = lib.cleanSource ./src;
+    phases = "unpackPhase buildPhase installPhase";
+    buildPhase = "${generator} build";
+    installPhase = ''
+      mkdir -p $out
       cp -r _site/* $out
     '';
   }
