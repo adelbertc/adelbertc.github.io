@@ -99,7 +99,7 @@ postPandocCompiler =
 
 feedConfiguration :: FeedConfiguration
 feedConfiguration = FeedConfiguration
-  { feedTitle       = "Finally Reified"
+  { feedTitle       = "Adelblog"
   , feedDescription = "Functional programming ∩ systems design."
   , feedAuthorName  = "Adelbert Chang"
   , feedAuthorEmail = ""
