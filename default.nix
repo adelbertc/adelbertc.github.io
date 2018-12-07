@@ -2,8 +2,8 @@ let
   pkgs = import ((import <nixpkgs> { }).fetchFromGitHub {
     owner  = "NixOS";
     repo   = "nixpkgs";
-    rev    = "43d3e539c5cd3b0ce0d08ca1b17831146da81a5f";
-    sha256 = "03r2ddpk2v17sc0742kdfnlj8sn5l60vz8a03ryiqsk5hkwn8cbv";
+    rev    = "c395d6250788686120aa1a00404b4de1a2fb547c";
+    sha256 = "1j8s23b0jcmy2vza0qz1i258avi4zbcwdxl5f0w0am1vj7icsx3r";
   }) { };
 
   stdenv = pkgs.stdenv;
@@ -14,7 +14,7 @@ let
     src = lib.cleanSource ./generator;
     buildInputs = [
       (pkgs.haskellPackages.ghcWithPackages (hpkgs: with hpkgs; [ hakyll ]))
-    ] ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.Cocoa;
+    ] ++ lib.optional stdenv.isDarwin [ pkgs.darwin.apple_sdk.frameworks.Cocoa pkgs.darwin.libiconv ];
     phases = "unpackPhase buildPhase";
     buildPhase = ''
       ghc -O2 --make site.hs -o $out
