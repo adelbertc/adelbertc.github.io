@@ -360,6 +360,6 @@ which can be seamlessly plugged in. Existential types are pretty cool
 [^2]: Obligatory [Constraints Liberate, Liberties Constrain](https://youtu.be/GqmsQeSzMdw).
 [^3]: This is not the best type signature for the method as the `Option` return
       type is dynamic whereas statically we should know if it is a `Some`
-      (last operation was a `get`) or `Non` (last operation was a `set`). This
+      (last operation was a `get`) or `None` (last operation was a `set`). This
       choice was made purely to simplify the presentation of this blog post.
       I'm sorry.
