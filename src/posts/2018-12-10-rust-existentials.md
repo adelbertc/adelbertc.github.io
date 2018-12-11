@@ -14,7 +14,7 @@ The Rust project I am working on is a caching layer, currently backed by
 [Redis][redis], and it came to a point where I needed to leverage
 [pipelining][redisPipeline].
 On its own, pipelining is straightforward as the [redis][redisCrate]
-implements it already. However all notions of a cache in our code are
+crate implements it already. However all notions of a cache in our code are
 abstracted out behind a trait so we can have alternative implementations,
 such as an in-memory `HashMap`-backed implementation.
 
