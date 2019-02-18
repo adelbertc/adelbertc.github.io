@@ -9,11 +9,7 @@ import           Text.Pandoc.Options
 --------------------------------------------------------------------------------
 main :: IO ()
 main = hakyllWith defaultConfiguration { deployCommand = "./deploy" } $ do
-    match "publications/*" $ do
-        route   idRoute
-        compile copyFileCompiler
-
-    match "images/*" $ do
+    match ("assets/*" .||. "publications/*") $ do
         route   idRoute
         compile copyFileCompiler
 
@@ -21,17 +17,7 @@ main = hakyllWith defaultConfiguration { deployCommand = "./deploy" } $ do
         route   idRoute
         compile compressCssCompiler
 
-    match (fromList ["about.md"]) $ do
-        route   $ setExtension "html"
-        compile $ pandocCompiler
-            >>= loadAndApplyTemplate "templates/default.html" defaultContext
-            >>= relativizeUrls
-
-    match "adelbertchang_resume.pdf" $ do
-        route   idRoute
-        compile copyFileCompiler
-
-    match (fromList ["publications.md"]) $ do
+    match (fromList ["about.md", "publications.md"]) $ do
         route   $ setExtension "html"
         compile $ pandocCompiler
             >>= loadAndApplyTemplate "templates/default.html" defaultContext

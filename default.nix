@@ -29,6 +29,5 @@ in
     installPhase = ''
       mkdir -p $out
       cp -r _site/* $out
-      cp adelbertchang_resume.pdf $out
     '';
   }
