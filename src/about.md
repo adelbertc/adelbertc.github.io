@@ -2,8 +2,8 @@
 title: About
 ---
 
-Adelbert Chang is a Lead Data Engineer at Target where he works on deployment infrastructure for the
-Data Science and Optimization team. Previously he worked at U.C. Santa Barbara doing research in
+Adelbert Chang is an engineer at Target where he works on deployment infrastructure for the
+AI Engineering team. Previously he worked at U.C. Santa Barbara doing research in
 large-scale graph querying and modeling, and in industry on machine learning systems, rule engines,
 and developer tools. Recently he has been exploring the intersection of functional programming and
 system design. He is an active open source contributor, speaker, and writer for projects spanning
