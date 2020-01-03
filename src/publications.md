@@ -8,6 +8,10 @@ title: Publications
 
 ### Talks
 
+Everything old is new: Yesterday's internet as today's infrastructure, Scale by the Bay 2019. [[Slides]](https://speakerdeck.com/adelbertc/everything-old-is-new-todays-infrastructure-as-yesterdays-internet) [[Video]](https://www.youtube.com/watch?v=-NTSDSK2vOw)
+
+Microservice architecture: A programming languages perspective, Curry On 2019. [[Slides]](https://speakerdeck.com/adelbertc/microservice-architecture-a-programming-languages-perspective) [[Video]](https://www.youtube.com/watch?v=OTcbp1fk0JY)
+
 Nelson: Functional programming in system design, Scale by the Bay 2018. [[Slides]](https://speakerdeck.com/adelbertc/nelson-functional-programming-in-system-design-sbtb-2018) [[Video]](https://youtu.be/c_bD9N4A7rY)
 
 Nelson: Functional programming in system design, NEScala 2018 and Scala Taiwan #23. [[Slides]](https://speakerdeck.com/adelbertc/nelson-functional-programming-in-system-design) [[Video]](https://youtu.be/t8KRo-DXnEo)
