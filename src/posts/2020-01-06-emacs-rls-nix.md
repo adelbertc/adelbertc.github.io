@@ -1,5 +1,5 @@
 ---
-title: Setting up version-specific RLS for Emacs with Nix and Direnv
+title: Setting up per-project RLS for Emacs with Nix and Direnv
 ---
 
 One of my favorite things about [Nix][nix] is using the nix-shell to provision the development tooling for a project
