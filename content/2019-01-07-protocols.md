@@ -1,6 +1,7 @@
----
-title: Stop speaking gibberish, start using interfaces
----
++++
+title = "Stop speaking gibberish, start using interfaces"
+date = 2019-01-07
++++
 
 In the age of modular microservices, data pipelines, serverless, and IoT, handling data serialization has become a major
 design decision. While monolithic architectures are well, monolithic, coordination between components is simply a
@@ -8,6 +9,8 @@ function call away. In contrast, components that are separated by a network or r
 must communicate by serializing and deserializing data. Add in questions like how much data is being serialized,
 how often it needs to be serialized, how many languages are in play, and how various components evolve, and we can see
 how data serialization has turned from an incidental problem to a central one.
+
+<!-- more -->
 
 One approach to this problem is to use language-native serialization like [Java serialization][javaSerialization]
 or [Python pickling][pickle]. So long as we are using the same language, this has the benefit of being convenient

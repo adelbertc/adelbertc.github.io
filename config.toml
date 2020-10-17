@@ -1,0 +1,24 @@
+title = "Adelblog"
+
+base_url = "https://www.adelbertc.com/"
+
+generate_feed = true
+
+compile_sass = true
+
+highlight_code = true
+
+build_search_index = false
+
+theme = "after-dark"
+
+[extra]
+after_dark_title = "Adelblog"
+
+after_dark_menu = [
+    {url = "$BASE_URL", name = "Home"},
+    {url = "$BASE_URL/about", name = "About"},
+    {url = "$BASE_URL/assets/adelbertchang_resume.pdf", name = "Resume"},
+    {url = "$BASE_URL/publications", name = "Publications"},
+    {url = "$BASE_URL/atom.xml", name = "Atom"},
+]

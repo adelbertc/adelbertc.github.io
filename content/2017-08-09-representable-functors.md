@@ -1,9 +1,12 @@
----
-title: Reasoning with representable functors
----
++++
+title = "Reasoning with representable functors"
+date = 2017-08-09
++++
 
 A couple weeks ago I was working on a project using Conal Elliott's [uniform-pair][uniformPairHackage] library and
 noticed it had a curious `Monad` instance, which I've reproduced below.
+
+<!-- more -->
 
 ```haskell
 data Pair a = Pair a a

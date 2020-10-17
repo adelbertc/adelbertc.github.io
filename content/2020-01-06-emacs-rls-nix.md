@@ -1,11 +1,14 @@
----
-title: Setting up per-project RLS for Emacs with Nix and Direnv
----
++++
+title = "Setting up per-project RLS for Emacs with Nix and Direnv"
+date = 2020-01-06
++++
 
 One of my favorite things about [Nix][nix] is using the nix-shell to provision the development tooling for a project
 without infecting the rest of the system. Even if the project itself isn't built with Nix, I will often have a
 `shell.nix` just to provision tools like [Cargo][cargo] and [SBT][sbt]. This becomes especially helpful with Rust
 where each of my Rust projects can have a different `rustc` version without needing to switch my [rustup][rustup] toolchain.
+
+<!-- more -->
 
 To that effect, I've setup my Emacs to use the Direnv integration [emacs-direnv][direnvEmacs] to provision the buffer's environment using the project's
 Nix shell whenever I open a file in that project --- if you're not familiar with Direnv I encourage you to

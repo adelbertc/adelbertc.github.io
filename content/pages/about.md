@@ -1,6 +1,7 @@
----
-title: About
----
++++
+path = "about"
+template = "plain.html"
++++
 
 Adelbert Chang is a Principal Engineer at OctoML where he works on systems for optimizing deep learning
 models. Previously he worked at U.C. Santa Barbara doing research in large-scale graph querying and modeling,

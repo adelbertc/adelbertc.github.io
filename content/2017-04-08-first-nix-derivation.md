@@ -1,10 +1,13 @@
----
-title: My first Nix derivation
----
++++
+title = "My first Nix derivation"
+date = 2017-04-08
++++
 
 When I started learning Nix I set myself a milestone of contributing a derivation
 to Nixpkgs. Along the way I learned some interesting things about the Nix toolchain
 and began to really appreciate the freedom it gave me to experiment.
+
+<!-- more -->
 
 I noticed [Coursier][coursier] was not in Nixpkgs and decided it would
 be a good project to complete my milestone. The fact that it has a

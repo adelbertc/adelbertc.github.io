@@ -1,6 +1,7 @@
----
-title: Publications
----
++++
+path = "publications"
+template = "plain.html"
++++
 
 ### Papers
 

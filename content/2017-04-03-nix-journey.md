@@ -1,12 +1,15 @@
----
-title: My journey into Nix
----
++++
+title = "My journey into Nix"
+date = 2017-04-03
++++
 
 As a Windows user for many years, I always liked that there was a
 way to uninstall any program I installed[^1]. When I moved to Mac OS and
 installed programs through the App Store, `brew`, `pip`, I quickly
 realized I had no clue how to reliably uninstall them. This made me quite
 uncomfortable, but I managed to live with it.
+
+<!-- more -->
 
 A few years later I heard about [Nix][nix] and how it solved exactly
 this problem. At a glance it seemed like a good approach, but I never

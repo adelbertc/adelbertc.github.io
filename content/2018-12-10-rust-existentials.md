@@ -1,6 +1,7 @@
----
-title: Existential types in Rust
----
++++
+title = "Existential types in Rust"
+date = 2018-12-10
++++
 
 For the past couple of weeks I have been using [Rust][rust] for a project at
 work and enjoying it a lot. The emphasis on systems programming
@@ -8,6 +9,8 @@ aligns well with my interest in systems, the unique type system keeps
 the programming languages enthusiast in me interested, and the use of
 expressive types, as always, keeps me in check and makes me confident in my
 code.
+
+<!-- more -->
 
 However, it wasn't long before I hit a bit of an obstacle.
 The Rust project I am working on is a caching layer, currently backed by

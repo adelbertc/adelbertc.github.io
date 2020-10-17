@@ -1,11 +1,14 @@
----
-title: Installing NixOS
----
++++
+title = "Installing NixOS"
+date = 2017-08-13
++++
 
 In an effort to force myself to learn [Nix][nix] I spent last weekend installing [NixOS][nixOS] on my desktop. It ended
 up being a fairly involved process for me, especially since I barely have any experience with Linux. Therefore I've
 decided to write about my installation process (to the best of my recollection anyways), both as a reminder to myself
 and for anyone else who may be curious.
+
+<!-- more -->
 
 Being new to Linux and easily sketched out, I tried my best to look up things I didn't understand and will try to
 replicate the explanations I found.
