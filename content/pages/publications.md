@@ -1,6 +1,6 @@
 +++
 path = "publications"
-template = "plain.html"
+template = "page.html"
 +++
 
 ### Papers

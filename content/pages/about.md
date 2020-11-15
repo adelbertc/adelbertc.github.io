@@ -1,6 +1,6 @@
 +++
 path = "about"
-template = "plain.html"
+template = "page.html"
 +++
 
 Adelbert Chang is a Principal Engineer at OctoML where he works on systems for optimizing deep learning
