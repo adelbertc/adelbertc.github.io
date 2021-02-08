@@ -98,7 +98,7 @@ long anymore.
 bishop and attack the e4 pawn, but easily met with f3 or Bd3. Turns out the engine
 likes it, perhaps because it also serves as a prophylactic to an annoying Bc5.
 
-11. Rd1+, developing the rook and gaining a tempo on the exposed king. 11...Ke8,
+11.Rd1+, developing the rook and gaining a tempo on the exposed king. 11...Ke8?,
 a natural move but the less intuitive 11...Ke7 would've been better, for reasons
 we are about to see. 12. Bb5+!, developing the bishop and gaining another tempo!
 
@@ -108,7 +108,7 @@ And here we see, if 11...Ke7, no such check would be possible and my opponent
 would be able to try to stabilize. 12...Bd7 is not possible here because
 13. Bxd7, protected by the rook. Here the king must slide to e7 anyways but my
 opponent makes a fatal mistake, 12...Kf8 and a nice mating net arises and it's
-lights out. 13. Rd8 Ke7 14. Re8#, protected by the bishop on b5.
+lights out. 13. Rd8+ Ke7 14. Re8#, protected by the bishop on b5.
 
 <img src="../chess/00_04.jpeg" width="300" height="300">
 
