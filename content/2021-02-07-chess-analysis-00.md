@@ -115,5 +115,7 @@ lights out. 13. Rd8 Ke7 14. Re8#, protected by the bishop on b5.
 The king cannot escape out the side doors as the e5 pawn from the fifth move stands
 in his way.
 
+Full PGN for the game available [here][/chess/00.pgn].
+
 [pogchamps]: https://www.chess.com/article/view/next-pogchamps-all-the-information
 [pogchampsVideo]: https://youtu.be/xJ55oA_nC7k
