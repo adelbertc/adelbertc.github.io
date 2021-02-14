@@ -106,7 +106,8 @@ I did consider! ... but incorrectly calculated 13...Bxc3 14. bxc3 Qxc3+,
 forking my king and rook. Ah but my trusted knight on e4 also defends c3!
 A completely missed calculation that led to my demise...and why board
 visualization is important (as an aside I tend to follow the advice of Ben
-Kingsley's [Bruce Pandolfini][brucePandolfini] "Don't move until you see it"
+Kingsley's [Bruce Pandolfini][brucePandolfini]
+"[Don't move until you see it][dontMoveScene]"
 in the fantastic [Searching for Bobby Fischer][searchingForFischer]
 when solving puzzles for this exact reason - being able to calculate without
 physically moving a piece is an important skill in a real game).
@@ -151,5 +152,6 @@ In the words of Grandmaster [Garry Kasparov][kasparov], "Find your mistakes,
 next time you have to do better."
 
 [brucePandolfini]: https://en.wikipedia.org/wiki/Bruce_Pandolfini
+[dontMoveScene]: https://youtu.be/4tSMH4O8G8w
 [kasparov]: https://en.wikipedia.org/wiki/Garry_Kasparov
 [searchingForFischer]: https://en.wikipedia.org/wiki/Searching_for_Bobby_Fischer
