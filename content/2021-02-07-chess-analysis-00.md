@@ -21,6 +21,8 @@ blog.
 
 <!-- more -->
 
+Follow along with the PGN [here](/chess/00.pgn).
+
 This first game to analyze I found fitting for a number of reasons - it is the
 first game I've managed to commit to memory, it is a relatively easy game for
 me to analyze, and it was a nice checkmate (currently I consider anything that's
@@ -114,8 +116,6 @@ lights out. 13. Rd8+ Ke7 14. Re8#, protected by the bishop on b5.
 
 The king cannot escape out the side doors as the e5 pawn from the fifth move stands
 in his way.
-
-Full PGN for the game available [here](/chess/00.pgn).
 
 [pogchamps]: https://www.chess.com/article/view/next-pogchamps-all-the-information
 [pogchampsVideo]: https://youtu.be/xJ55oA_nC7k
