@@ -1,6 +1,8 @@
 +++
 title = "Chess Analysis #01: A Contrast of Man and Machine"
 date =  2021-02-14
+[taxonomies]
+tags=["chess"]
 +++
 
 This game the engine did not like at all, scoring me at 21.5% accuracy to my

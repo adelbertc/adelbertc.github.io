@@ -1,6 +1,8 @@
 +++
 title = "Existential types in Rust"
 date = 2018-12-10
+[taxonomies]
+tags=["code", "programming-languages"]
 +++
 
 For the past couple of weeks I have been using [Rust][rust] for a project at

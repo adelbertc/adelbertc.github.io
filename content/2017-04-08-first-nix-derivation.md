@@ -1,6 +1,8 @@
 +++
 title = "My first Nix derivation"
 date = 2017-04-08
+[taxonomies]
+tags=["code", "nix"]
 +++
 
 When I started learning Nix I set myself a milestone of contributing a derivation

@@ -1,6 +1,8 @@
 +++
 title = "Setting up per-project RLS for Emacs with Nix and Direnv"
 date = 2020-01-06
+[taxonomies]
+tags=["code", "nix"]
 +++
 
 One of my favorite things about [Nix][nix] is using the nix-shell to provision the development tooling for a project

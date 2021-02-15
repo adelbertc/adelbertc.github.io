@@ -1,6 +1,8 @@
 +++
 title = "Installing NixOS"
 date = 2017-08-13
+[taxonomies]
+tags=["code", "nix"]
 +++
 
 In an effort to force myself to learn [Nix][nix] I spent last weekend installing [NixOS][nixOS] on my desktop. It ended

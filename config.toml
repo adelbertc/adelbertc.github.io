@@ -13,7 +13,6 @@ build_search_index = false
 theme = "anpu"
 
 taxonomies = [
-    { name = "categories" },
     { name = "tags" },
 ]
 
@@ -23,6 +22,7 @@ anpu_menu_links = [
     { url = "$BASE_URL/about", name = "About" },
     { url = "$BASE_URL/assets/adelbertchang_resume.pdf", name = "Resume" },
     { url = "$BASE_URL/publications", name = "Publications" },
+    { url = "$BASE_URL/tags", name = "Tags" },
     { url = "$BASE_URL/atom.xml", name = "Atom" },
 ]
 

@@ -1,6 +1,8 @@
 +++
 title = "My journey into Nix"
 date = 2017-04-03
+[taxonomies]
+tags=["code", "nix"]
 +++
 
 As a Windows user for many years, I always liked that there was a

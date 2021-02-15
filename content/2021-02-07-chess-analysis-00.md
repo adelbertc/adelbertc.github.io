@@ -1,6 +1,8 @@
 +++
 title = "Chess Analysis #00: A Quick Drink of Scotch"
 date =  2021-02-07
+[taxonomies]
+tags=["chess"]
 +++
 
 A couple months ago I was browsing YouTube and stumbled across a recording of a

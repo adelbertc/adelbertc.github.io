@@ -1,6 +1,8 @@
 +++
 title = "The Limitations of Type Classes as Subtyped Implicits at Scala'17"
 date = 2017-09-20
+[taxonomies]
+tags=["code", "programming-languages"]
 +++
 
 I am excited to say my short paper "The Limitations of Type Classes as Subtyped

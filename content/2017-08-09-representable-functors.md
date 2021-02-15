@@ -1,6 +1,8 @@
 +++
 title = "Reasoning with representable functors"
 date = 2017-08-09
+[taxonomies]
+tags=["code", "programming-languages"]
 +++
 
 A couple weeks ago I was working on a project using Conal Elliott's [uniform-pair][uniformPairHackage] library and

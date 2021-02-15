@@ -1,6 +1,8 @@
 +++
 title = "Stop speaking gibberish, start using interfaces"
 date = 2019-01-07
+[taxonomies]
+tags=["code", "programming-languages", "systems"]
 +++
 
 In the age of modular microservices, data pipelines, serverless, and IoT, handling data serialization has become a major
