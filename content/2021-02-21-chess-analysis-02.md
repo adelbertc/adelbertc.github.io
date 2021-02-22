@@ -11,7 +11,9 @@ did.
 
 <!-- more -->
 
-Follow along with the PGN [here](/chess/02.pgn).
+Follow along with the PGN [here](/chess/02.pgn), or use the interactive board below:
+
+<iframe id="7630126" allowtransparency="true" frameborder="0" style="width:100%;border:none;" src="//www.chess.com/emboard?id=7630126"></iframe><script>window.addEventListener("message",e=>{e['data']&&"7630126"===e['data']['id']&&document.getElementById(`${e['data']['id']}`)&&(document.getElementById(`${e['data']['id']}`).style.height=`${e['data']['frameHeight']+30}px`)});</script>
 
 Let's get right into it - 1. e4 e5 2. Nf3 d6 - a Philidor!
 

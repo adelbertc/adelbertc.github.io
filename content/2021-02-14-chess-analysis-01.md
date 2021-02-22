@@ -14,7 +14,9 @@ playing chess versus that of an emotional human.
 
 <!-- more -->
 
-Follow along with the PGN [here](/chess/01.pgn).
+Follow along with the PGN [here](/chess/01.pgn), or use the interactive board below:
+
+<iframe id="7630130" allowtransparency="true" frameborder="0" style="width:100%;border:none;" src="//www.chess.com/emboard?id=7630130"></iframe><script>window.addEventListener("message",e=>{e['data']&&"7630130"===e['data']['id']&&document.getElementById(`${e['data']['id']}`)&&(document.getElementById(`${e['data']['id']}`).style.height=`${e['data']['frameHeight']+30}px`)});</script>
 
 I went into the game with my usual plan to play into a Scotch, but the opponent
 went for a Petrov's Defense with 2...Nf6 instead of 2...Nc6. The general plan

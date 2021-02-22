@@ -23,7 +23,9 @@ blog.
 
 <!-- more -->
 
-Follow along with the PGN [here](/chess/00.pgn).
+Follow along with the PGN [here](/chess/00.pgn), or use the interactive board below:
+
+<iframe id="7630132" allowtransparency="true" frameborder="0" style="width:100%;border:none;" src="//www.chess.com/emboard?id=7630132"></iframe><script>window.addEventListener("message",e=>{e['data']&&"7630132"===e['data']['id']&&document.getElementById(`${e['data']['id']}`)&&(document.getElementById(`${e['data']['id']}`).style.height=`${e['data']['frameHeight']+30}px`)});</script>
 
 This first game to analyze I found fitting for a number of reasons - it is the
 first game I've managed to commit to memory, it is a relatively easy game for
