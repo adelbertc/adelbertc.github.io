@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>My journey into Nix</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>My journey into Nix</h1>
+    </header>
+    <div class="content">
+        <p>As a Windows user for many years, I always liked that there was a
+way to uninstall any program I installed<sup class="footnote-reference"><a href="#1">1</a></sup>. When I moved to Mac OS and
+installed programs through the App Store, <code>brew</code>, <code>pip</code>, I quickly
+realized I had no clue how to reliably uninstall them. This made me quite
+uncomfortable, but I managed to live with it.</p>
+<span id="continue-reading"></span>
+<p>A few years later I heard about <a href="http://nixos.org/nix/">Nix</a> and how it solved exactly
+this problem. At a glance it seemed like a good approach, but I never
+got around to trying it until recently. So far I've been really liking
+what I've seen and wanted to share what I learned.</p>
+<h2 id="what-is-nix">What is Nix?</h2>
+<p>Nix is a cross-platform package manager, working across Linux variants,
+Mac OS, and Windows.</p>
+<p>Nix is also a pure functional package manager, treating package installs
+like a pure functional data structure. Where most package managers update
+packages by mutating the install in-place, Nix installs new versions in
+a separate location and shuffles some &quot;pointers&quot; to point to the new one.
+The old one continues to exist in its original location - that is, until
+the garbage collector is run.</p>
+<p>Let's see what this actually means.</p>
+<h3 id="the-nix-store">The Nix store</h3>
+<p>Nix installs packages in the <em>Nix store</em>, located by default under <code>/nix/store</code>.
+Everything lives in the Nix store, including Nix itself<sup class="footnote-reference"><a href="#2">2</a></sup>. Installing a package
+<code>foo</code> through Nix installs it into <code>/nix/store/&lt;hash&gt;-foo-&lt;version&gt;</code>. The configuration
+of <code>foo</code> determines the hash and its version determines, well, the version. This
+means for any given package, the following are installed in different locations:</p>
+<ol>
+<li>Different configuration, different version</li>
+<li>Different configuration, same version</li>
+<li>Same configuration, different version</li>
+</ol>
+<p>Thus, installing different configurations or versions is not destructive</p>
+<ul>
+<li>the old version continues to exist in a different location. This is what makes
+Nix purely functional.</li>
+</ul>
+<p>If an install has dependencies (e.g. <a href="http://www.scala-sbt.org/">sbt</a> depends
+on a JDK), those dependencies are installed under their corresponding
+<code>&lt;hash&gt;-&lt;package&gt;-&lt;version&gt;</code> folder. If two or more packages require the same
+dependency, that dependency is shared<sup class="footnote-reference"><a href="#3">3</a></sup>.</p>
+<p>Here are some basic commands to get started with Nix. You may want
+to run <code>nix-channel --update</code> before to make sure you have
+the latest set of packages. Nix channels will be discussed later in this post.</p>
+<p>+----------------------+-----------------------------------------------------------+
+| Command              | Description                                               |
++:=====================+:==========================================================+
+| <code>nix-env -qaP [pkg]</code> | Check to see if [pkg] is available through Nix, showing   |
+|                      | its Nix attribute path if available.                      |
++----------------------+-----------------------------------------------------------+
+| <code>nix-env -iA [attr]</code> | Install a package by its attribute path [attr].           |
++----------------------+-----------------------------------------------------------+
+| <code>nix-env -u [pkg]</code>   | Update [pkg]. We can add <code>--dry-run</code> to see what would    |
+|                      | be installed without actually updating if we're nervous.  |
++----------------------+-----------------------------------------------------------+
+| <code>nix-env -e [pkg]</code>   | &quot;Uninstalls&quot; [pkg] - read the next section to learn what  |
+|                      | actually happens when we uninstall a package.             |
++----------------------+-----------------------------------------------------------+</p>
+<p>Please refer to the <a href="http://nixos.org/nix/manual/">Nix manual</a> for more information on these commands.</p>
+<h3 id="how-nix-manages-packages">How Nix manages packages</h3>
+<p>Given this hash-based install scheme, how do we actually use a package
+after it's installed? It would be annoying if we had to manually specify
+the path of the package we wanted, hash and all. Nix's answer to this
+is user environments, generations, and profiles.</p>
+<p>User environments hold symlinks to the installed packages. For instance,
+running <code>ls -l</code> on my currently active user environment shows something like<sup class="footnote-reference"><a href="#4">4</a></sup>:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ ls -l /nix/store/&lt;hash&gt;-user-environment/bin/
+cabal -&gt; /nix/store/&lt;hash&gt;-cabal-install-1.24.0.2/bin/cabal
+ghc-mod -&gt; /nix/store/&lt;hash&gt;-ghc-mod-5.7.0.0/bin/ghc-mod
+ghc-modi -&gt; /nix/store/&lt;hash&gt;-ghc-mod-5.7.0.0/bin/ghc-modi
+hakyll-init -&gt; /nix/store/&lt;hash&gt;-hakyll-4.9.5.1/bin/hakyll-init
+nix-build -&gt; /nix/store/&lt;hash&gt;-nix-1.11.7/bin/nix-build
+...
+</span></code></pre>
+<p>Every time a package is installed, uninstalled, or updated, a new user
+environment is created with the corresponding symlinks created, removed,
+or modified.</p>
+<p>User environments are named with a hash followed by <code>-user-environment</code>,
+located alongside other packages in the Nix store. This becomes important
+when we look at how removing packages works.</p>
+<p>Symlinked to user environments are generations, located outside of the
+store (but still under <code>/nix</code>) in <code>/nix/var/nix/profiles</code>. Running <code>ls -l</code>
+shows something like:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ ls -l /nix/var/nix/profiles/
+default -&gt; default-23-link
+default-20-link -&gt; /nix/store/&lt;hash&gt;-user-environment
+default-21-link -&gt; /nix/store/&lt;hash&gt;-user-environment
+default-22-link -&gt; /nix/store/&lt;hash&gt;-user-environment
+default-23-link -&gt; /nix/store/&lt;hash&gt;-user-environment
+...
+</span></code></pre>
+<p>Here the <code>default-N-link</code> symlinks are <em>generations</em> for the <code>default</code> <em>profile</em>.
+Whenever a user environment is created, a corresponding generation is created
+that points to it. The profile is then modified to point at this new generation.
+Since symlinking is an atomic operation, these series of symlinks allow Nix to
+perform atomic upgrades. If at any point during an install we decide to hit <code>Ctrl+C</code>,
+our profile is left untouched. The Nix store may contain dirty state leftover from
+the terminated install, but those will get handled if the install is retried or the garbage
+collector is run.</p>
+<p>We're almost ready to get the packages on our <code>PATH</code>. In each user's home
+directory there is a <code>~/.nix-profile</code> symlink which points at their profile
+(different users may have different profiles). When Nix was installed,
+it added a statement in the user's bash profile (e.g. <code>~/.profile</code>) to
+source a script in this profile which chases the symlinks all the way down and
+adds the <code>bin</code> to the <code>PATH</code>.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ cat ~/.profile
+...
+
+if [ -e /.../.nix-profile/etc/profile.d/nix.sh ]; then
+  . /.../.nix-profile/etc/profile.d/nix.sh;
+fi
+
+...
+</span></code></pre><h3 id="rollbacks">Rollbacks</h3>
+<p>Because Nix does not do destructive updates, rollbacks are easy.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ nix-env --rollback
+</span></code></pre>
+<p>What is interesting is we can even rollback uninstalls. To Nix, this is
+no different than rolling back an install. Each install, uninstall, and
+update creates a new user environment with a new generation. A rollback
+simply changes the pointer to point at the previous generation.</p>
+<p>We can also rollback to a specific generation.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ nix-env --list-generations
+  20   2017-03-17 10:57:28
+  21   2017-03-21 21:44:18
+  22   2017-03-21 21:46:56
+  23   2017-03-26 12:23:13   (current)
+
+$ nix-env --switch-generation 22
+</span></code></pre>
+<p>The numbers here correspond to the numbers in the symlinks.</p>
+<h3 id="garbage-collection">Garbage collection</h3>
+<p>Up to this point we've only seen Nix add packages to the store.
+Given our machines have limited disk space, at some point Nix needs
+to actually delete packages from the store.</p>
+<p>Nix does this via <em>garbage collection</em>, sharing the same name
+and purpose as the memory management mechanism. Where in programs
+garbage collection tracks object references, Nix tracks symlinks
+into the Nix store.</p>
+<p>Recall that generations are symlinks into user environments located
+in the store, which in turn are symlinks to packages. This means
+that so long as generations are never deleted, every package is
+reachable and ineligible for garbage collection (consider what
+happens if a package was garbage collected and we then switched
+to a generation that referenced that package).</p>
+<p>Therefore in order for packages to be removed, generations need to
+be deleted. Generation deletion is an explicit step done by the
+user - Nix will not delete generations by itself.</p>
+<p>One way to delete generations is by number.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ nix-env --delete-generations 20 21
+removing generation 20
+removing generation 21
+$ nix-env --list-generations
+  22   2017-03-21 21:46:56
+  23   2017-03-26 12:23:13   (current)
+</span></code></pre>
+<p>To delete all old generations, we can use <code>nix-env --delete-generations old</code>.</p>
+<p>Now we have some user environments, and by extension packages, with no
+references to them. We can see what these are by running
+<code>nix-store --gc --print-dead</code>. To run the garbage collector and delete
+them, we run <code>nix-store --gc</code>.</p>
+<h3 id="nix-the-language">Nix the language</h3>
+<p>&quot;Nix&quot; refers to the package manager we've been discussing, but also to
+the related programming language. Packages in Nix are specified by
+expressions written in Nix the language. These expressions create <em>derivations</em>
+which tell Nix how to build a package.</p>
+<p>At this point I could write a tutorial on the Nix language, but it would just end up being an
+ad-hoc, informally-written, bug-ridden copy of the
+<a href="http://nixos.org/nix/manual/#chap-writing-nix-expressions">Nix manual chapter on expressions</a> and
+<a href="https://medium.com/@MrJamesFisher/nix-by-example-a0063a1a4c55">Nix by example: The Nix expression language</a><sup class="footnote-reference"><a href="#5">5</a></sup>. If you're
+interested in learning about Nix the language, I would recommend reading those.</p>
+<p>I have also been told by several people that the <a href="http://lethalman.blogspot.com/2014/07/nix-pill-1-why-you-should-give-it-try.html">Nix pill</a> series is
+very good. I've yet to read it myself, but it's definitely on my to-read list.</p>
+<h3 id="nixpkgs">Nixpkgs</h3>
+<p><a href="http://nixos.org/nixpkgs/">Nixpkgs</a> is the primary way of installing packages through Nix. Nixpkgs
+is a repository of Nix expressions, each of which tell Nix how to build a package
+from source. For example, <a href="https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/misc/hello/default.nix">here</a> is the Nix expression for building GNU Hello.</p>
+<p>Different operating systems will track Nixpkgs through different <em>channels</em>, which are
+essentially branches of the repository. I use Mac OS, so my Nix tracks the &quot;unstable&quot;
+channel which is the master branch after it passes through a periodically running
+CI.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">$ nix-channel --list
+nixpkgs https://nixos.org/channels/nixpkgs-unstable
+</span></code></pre>
+<p>While Nix derivations tell Nix how to build a package from source, this doesn't mean we're
+doomed to say, build Rust from source (which involves multiple bootstraps of the compiler).
+Whenever we ask Nix to install a package, it will first check an upstream cache for a
+previously built binary<sup class="footnote-reference"><a href="#6">6</a></sup>. If the binary exists it is downloaded to the appropriate location
+and the install completes. It is only when the binary doesn't exist that the system builds
+the package from source.</p>
+<h2 id="freedom-to-explore">Freedom to explore</h2>
+<p>The best part of Nix is that it gives us the freedom to explore.  With traditional
+package managers every install and upgrade is risky. With Nix these are guaranteed not to
+cause problems. If we install something and don't like what we see, a rollback is just a
+command away. This enables us to discover, experiment, and play with new packages risk-free,
+a truly liberating feeling.</p>
+<h2 id="further-reading">Further reading</h2>
+<p>Here are some resources I found valuable when learning Nix.</p>
+<ol>
+<li><a href="http://nixos.org/nix/manual/">Nix manual</a></li>
+<li><a href="https://begriffs.com/posts/2016-08-08-intro-to-nixos.html">Purely Functional Linux with NixOS</a></li>
+<li><a href="http://nixos.org/nixpkgs/manual/">Nixpkgs manual</a></li>
+</ol>
+<div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
+<p>I know this isn't entirely true due to files the program may
+keep in other places, but I didn't know that at the time.</p>
+</div>
+<div class="footnote-definition" id="2"><sup class="footnote-definition-label">2</sup>
+<p>When you <a href="http://nixos.org/nix/manual/#chap-installation">install Nix</a>, the installer places the Nix tools in the store
+as if it were installed by Nix itself. This bootstraps Nix to be managed by Nix,
+and makes it easy to opt out if you decide Nix isn't for you (just destroy the
+Nix store).</p>
+</div>
+<div class="footnote-definition" id="3"><sup class="footnote-definition-label">3</sup>
+<p>This behavior matches exactly that of persistent data structures, and is safe for
+the same reasons.</p>
+</div>
+<div class="footnote-definition" id="4"><sup class="footnote-definition-label">4</sup>
+<p>Here we see Nix tools like <code>nix-build</code> are installed alongside packages.</p>
+</div>
+<div class="footnote-definition" id="5"><sup class="footnote-definition-label">5</sup>
+<p><a href="https://en.wikipedia.org/wiki/Greenspun&#x27;s_tenth_rule">Greenspun's tenth rule</a></p>
+</div>
+<div class="footnote-definition" id="6"><sup class="footnote-definition-label">6</sup>
+<p>These pre-built binaries are built by a central <a href="http://nixos.org/hydra/">Hydra</a> cluster.</p>
+</div>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date"> 3 April 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/nix/">#nix</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

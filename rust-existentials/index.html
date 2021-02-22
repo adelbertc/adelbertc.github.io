@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>Existential types in Rust</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>Existential types in Rust</h1>
+    </header>
+    <div class="content">
+        <p>For the past couple of weeks I have been using <a href="https://www.rust-lang.org/en-US/">Rust</a> for a project at
+work and enjoying it a lot. The emphasis on systems programming
+aligns well with my interest in systems, the unique type system keeps
+the programming languages enthusiast in me interested, and the use of
+expressive types, as always, keeps me in check and makes me confident in my
+code.</p>
+<span id="continue-reading"></span>
+<p>However, it wasn't long before I hit a bit of an obstacle.
+The Rust project I am working on is a caching layer, currently backed by
+<a href="https://redis.io/">Redis</a>, and it came to a point where I needed to leverage
+<a href="https://redis.io/topics/pipelining">pipelining</a>.
+On its own, pipelining is straightforward as the <a href="https://crates.io/crates/redis">redis</a>
+crate implements it already. However all notions of a cache in our code are
+abstracted out behind a trait so we can have alternative implementations,
+such as an in-memory <code>HashMap</code>-backed implementation.</p>
+<p>The problem arises with representing the pipeline in code. The redis crate
+encodes the pipeline with the <code>redis::Pipeline</code> struct:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#65737e;">// Taken from https://docs.rs/redis/0.9.1/redis/struct.Pipeline.html
+
+</span><span style="color:#b48ead;">let </span><span style="color:#c0c5ce;">((k1, k2),) : ((</span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">, </span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">),) = redis::pipe()
+    .</span><span style="color:#96b5b4;">cmd</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">SET</span><span style="color:#c0c5ce;">&quot;).</span><span style="color:#96b5b4;">arg</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">key_1</span><span style="color:#c0c5ce;">&quot;).</span><span style="color:#96b5b4;">arg</span><span style="color:#c0c5ce;">(</span><span style="color:#d08770;">42</span><span style="color:#c0c5ce;">).</span><span style="color:#96b5b4;">ignore</span><span style="color:#c0c5ce;">()
+    .</span><span style="color:#96b5b4;">cmd</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">SET</span><span style="color:#c0c5ce;">&quot;).</span><span style="color:#96b5b4;">arg</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">key_2</span><span style="color:#c0c5ce;">&quot;).</span><span style="color:#96b5b4;">arg</span><span style="color:#c0c5ce;">(</span><span style="color:#d08770;">43</span><span style="color:#c0c5ce;">).</span><span style="color:#96b5b4;">ignore</span><span style="color:#c0c5ce;">()
+    .</span><span style="color:#96b5b4;">cmd</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">MGET</span><span style="color:#c0c5ce;">&quot;).</span><span style="color:#96b5b4;">arg</span><span style="color:#c0c5ce;">(&amp;[&quot;</span><span style="color:#a3be8c;">key_1</span><span style="color:#c0c5ce;">&quot;, &quot;</span><span style="color:#a3be8c;">key_2</span><span style="color:#c0c5ce;">&quot;]).</span><span style="color:#96b5b4;">query</span><span style="color:#c0c5ce;">(&amp;con)
+</span></code></pre>
+<p>I could augment our trait to use this <code>Pipeline</code> struct..</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">trait </span><span style="color:#c0c5ce;">Cache {
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">pipe</span><span style="color:#c0c5ce;">() -&gt; redis::Pipeline;
+}
+</span></code></pre>
+<p>..but that would force any implementation of our cache to Redis's notion of
+a pipeline. Not only would this make it difficult to introspect during testing,
+but it would also be nonsensical for our <code>HashMap</code>-backed cache. What I needed
+was a way to return an abstract type that could change from implementation to
+implementation, yet still allow a set of operations on it so clients would be
+able to work with the abstract type despite not knowing what it was concretely.</p>
+<p>My usual answer to this in languages that support higher-kinded types is to use
+<a href="http://okmij.org/ftp/tagless-final/index.html">tagless-final</a> algebras, but Rust's type system
+<a href="https://github.com/rust-lang/rfcs/issues/324">currently doesn't support higher-kinded types</a><sup class="footnote-reference"><a href="#1">1</a></sup>. Fortunately,
+there is a pretty good alternative that Rust does support: existential types.</p>
+<h3 id="an-overview-of-existential-types">An overview of existential types</h3>
+<p>Many languages support <em>universally</em> quantified types, more commonly known as
+generics or parameterized types. Significantly fewer support
+<em>existentially</em> quantified types - the more mainstream languages that do
+support it consist of Scala, Haskell, OCaml, and as we will see in this
+post, Rust.</p>
+<p>A universally quantified type communicates the idea of &quot;for all types,&quot; hence
+the use of the phrase &quot;universal.&quot; In code this translates to the <em>caller</em>
+being able to pick the instantiated type.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">take</span><span style="color:#c0c5ce;">&lt;A&gt;(</span><span style="color:#bf616a;">vec</span><span style="color:#c0c5ce;">: Vec&lt;A&gt;, </span><span style="color:#bf616a;">n</span><span style="color:#c0c5ce;">: </span><span style="color:#b48ead;">usize</span><span style="color:#c0c5ce;">) -&gt; Vec&lt;A&gt; {
+  ...
+}
+
+take::&lt;</span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt;(vec![</span><span style="color:#d08770;">1</span><span style="color:#c0c5ce;">, </span><span style="color:#d08770;">2</span><span style="color:#c0c5ce;">, </span><span style="color:#d08770;">3</span><span style="color:#c0c5ce;">], </span><span style="color:#d08770;">3</span><span style="color:#c0c5ce;">);
+take::&lt;&amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">&gt;(vec![&quot;</span><span style="color:#a3be8c;">hello</span><span style="color:#c0c5ce;">&quot;, &quot; &quot;, &quot;</span><span style="color:#a3be8c;">world</span><span style="color:#c0c5ce;">&quot;], </span><span style="color:#d08770;">1</span><span style="color:#c0c5ce;">);
+</span></code></pre>
+<p>The above snippet defines a function <code>take</code> with universally quantified
+type <code>A</code>. The callers below then pick whatever instantiation of <code>A</code> they want,
+in this case <code>i32</code> and <code>&amp;str</code>.</p>
+<p>In contrast, existentially quantified types communicates &quot;there exists a type.&quot;
+In code this translates to the <em>callee</em>, or function, picking the instantiated
+type.</p>
+<p>One way Rust encodes this is through the <code>impl Trait</code> feature introduced in
+Rust 1.26 (or similarly with <code>Box&lt;Trait&gt;</code>). The idea is functions can specify
+just the trait a return type implements instead of a concrete type - this
+constrains the caller to only be able to use methods available on that trait
+and liberates the callee to be able to swap the internals without the
+caller being the wiser<sup class="footnote-reference"><a href="#2">2</a></sup>.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">pub trait </span><span style="color:#c0c5ce;">Token {
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">render</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">) -&gt; String
+}
+
+</span><span style="color:#b48ead;">impl </span><span style="color:#c0c5ce;">Token </span><span style="color:#b48ead;">for </span><span style="color:#c0c5ce;">String {
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">render</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">) -&gt; String {
+    </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">clone</span><span style="color:#c0c5ce;">()
+  }
+}
+
+</span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get_token</span><span style="color:#c0c5ce;">() -&gt; impl Token {
+  &quot;</span><span style="color:#a3be8c;">this is not a token</span><span style="color:#c0c5ce;">&quot;.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">()
+}
+
+</span><span style="color:#b48ead;">let</span><span style="color:#c0c5ce;"> token = </span><span style="color:#96b5b4;">get_token</span><span style="color:#c0c5ce;">();
+</span></code></pre>
+<p>Here we define a function <code>get_token</code> whose static type states it returns some
+type (<em>there exists</em> some type..) that implements the <code>Token</code> trait. Even
+though the function <em>interally</em> is using <code>String</code>, that information is
+hidden/lost with the <code>impl Token</code> return type. All we can do with <code>token</code> is
+call the <code>render</code> method on it and nothing else, not even methods on <code>String</code>.
+If at a later point the implementation of <code>get_token</code> changes to some other
+type that implements <code>Token</code>, that can happen transparently to all existing
+call-sites.</p>
+<h3 id="sharing-is-caring">Sharing is caring</h3>
+<p>One downside of the <code>impl Trait</code> approach is there is no way to have a group
+of functions share the same view of an existential type. For example if we
+wanted to write a <code>renew_token</code> function that took the same token type as
+<code>get_token</code>
+and returned a new token, there is no way for us to communicate to Rust that
+the <code>impl Token</code> returned by <code>get_token</code> should be the same <code>impl Token</code>
+consumed and produced by <code>renew_token</code>. Indeed, Rust rejects the following
+addition..</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#65737e;">// ...
+
+</span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get_token</span><span style="color:#c0c5ce;">() -&gt; impl Token {
+  ...
+}
+
+</span><span style="color:#65737e;">// ...
+
+</span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">renew_token</span><span style="color:#c0c5ce;">(</span><span style="color:#bf616a;">token</span><span style="color:#c0c5ce;">: impl Token) -&gt; impl Token {
+  unimplemented!()
+}
+
+</span><span style="color:#b48ead;">let mut</span><span style="color:#c0c5ce;"> expired_token = </span><span style="color:#96b5b4;">get_token</span><span style="color:#c0c5ce;">();
+expired_token = </span><span style="color:#96b5b4;">renew_token</span><span style="color:#c0c5ce;">(expired_token);
+</span></code></pre>
+<p>..with error &quot;expected anonymized type, found a different anonymized type.&quot;
+This is because given the types in their current form, there is no guarantee
+the two <code>impl Token</code>s are the same - <code>get_token</code> could return a <code>String</code>
+and <code>renew_token</code> could return a JSON Web Token and so the type checker must
+pessimistically reject the re-assignment.</p>
+<p>Thankfully Rust provides another approach to existential types through its
+associated types feature. Instead of hiding the concrete type behind
+<code>impl Trait</code>, we can use associated types and parameterize functions with
+type parameters that implement the corresponding trait. For example:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">pub trait </span><span style="color:#c0c5ce;">Token {
+  </span><span style="color:#b48ead;">type </span><span style="color:#c0c5ce;">Token;
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get_token</span><span style="color:#c0c5ce;">() -&gt; </span><span style="color:#b48ead;">Self::</span><span style="color:#c0c5ce;">Token;
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">renew_token</span><span style="color:#c0c5ce;">(</span><span style="color:#bf616a;">t</span><span style="color:#c0c5ce;">: </span><span style="color:#b48ead;">Self::</span><span style="color:#c0c5ce;">Token) -&gt; </span><span style="color:#b48ead;">Self::</span><span style="color:#c0c5ce;">Token;
+}
+
+</span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get_and_renew</span><span style="color:#c0c5ce;">&lt;T: Token&gt;() -&gt; </span><span style="color:#b48ead;">T::</span><span style="color:#c0c5ce;">Token {
+  </span><span style="color:#b48ead;">let</span><span style="color:#c0c5ce;"> token = T::get_token();
+  </span><span style="color:#96b5b4;">renew_token</span><span style="color:#c0c5ce;">(token)
+}
+</span></code></pre>
+<p>This time we define a trait <code>Token</code> with an abstract associated type and
+define methods that point to that associated type. Because now we have
+a single type definition to point to, we can tell the compiler that for
+a given implementation of <code>Token</code>, <code>get_token</code> and <code>renew_token</code> must
+refer to the same <code>Token</code> type.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">impl </span><span style="color:#c0c5ce;">Token </span><span style="color:#b48ead;">for </span><span style="color:#c0c5ce;">String {
+  </span><span style="color:#b48ead;">type </span><span style="color:#c0c5ce;">Token = String;
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get_token</span><span style="color:#c0c5ce;">() -&gt; String {
+    &quot;</span><span style="color:#a3be8c;">this is not a token</span><span style="color:#c0c5ce;">&quot;.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">()
+  }
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">renew_token</span><span style="color:#c0c5ce;">(</span><span style="color:#bf616a;">t</span><span style="color:#c0c5ce;">: String) -&gt; String {
+    &quot;</span><span style="color:#a3be8c;">this is not a renewed token</span><span style="color:#c0c5ce;">&quot;.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">()
+  }
+}
+</span></code></pre>
+<p>We then define a function <code>get_and_renew</code> that is parameterized by (or if
+you'd like, universally quantified over) a type <code>T</code> that implements <code>Token</code>.
+However, since inside the definition of <code>get_and_renew</code> we do not know what
+<code>T</code> will be, the associated type <code>T::Token</code> is abstract to us and thus
+existentially quantified. We only know that calling <code>T::get_token</code> will give
+us some type <code>T::Token</code> (the existential type), but now we also know we can
+pass that <code>T::Token</code> to <code>T::renew_token</code> and get back a token of the same type!</p>
+<p>This approach mimics the &quot;<a href="https://v1.realworldocaml.org/v1/en/html/files-modules-and-programs.html">ML-style modules</a>&quot; technique that is
+the primary organization and abstraction mechanism in the ML-family of
+languages (e.g. <a href="http://sml-family.org/">Standard ML</a> and <a href="https://ocaml.org/">OCaml</a>). Indeed, just like
+the ML-family of languages, we can organize entire Rust programs like this
+and at the top-level seamlessly swap out different implementations of different
+components by instantiating different types (e.g. <code>String</code> or JWT in the above
+example).</p>
+<h3 id="an-end-to-end-example-caching-with-redis-and-a-hash-table">An end-to-end example: caching with Redis and a hash table</h3>
+<p>Going back to the initial motivation for this adventure, we can now see how we
+can abstract over a caching layer with existential types.</p>
+<p>First we define the operations we want our cache to have in a trait - for
+simplicity we assume a cache with string keys and integer values:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">pub trait </span><span style="color:#c0c5ce;">Cache {
+  </span><span style="color:#b48ead;">type </span><span style="color:#c0c5ce;">Pipe: Pipeline;
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">pipe</span><span style="color:#c0c5ce;">() -&gt; </span><span style="color:#b48ead;">Self::</span><span style="color:#c0c5ce;">Pipe;
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">query</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">pipe</span><span style="color:#c0c5ce;">: </span><span style="color:#b48ead;">Self::</span><span style="color:#c0c5ce;">Pipe) -&gt; Option&lt;</span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt;;
+}
+
+</span><span style="color:#b48ead;">pub trait </span><span style="color:#c0c5ce;">Pipeline {
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">key</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">);
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">set</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">key</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">value</span><span style="color:#c0c5ce;">: </span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">);
+}
+</span></code></pre>
+<p>We define a <code>Cache</code> trait with an associated type <code>Pipe</code> which represents
+our pipelined operations. <code>Pipe</code> is constrained to implement the <code>Pipeline</code>
+trait which captures the operations the pipeline supports - this could have
+been on the <code>Cache</code> trait itself but separating it out and making the
+operations methods makes it more ergonomic.</p>
+<p>Our cache provides two operations: <code>pipe</code> which creates a new
+pipeline, and <code>query</code> which executes the pipeline and returns either
+<code>Some</code> if the last operation was a <code>get</code> and <code>None</code> if it was a <code>set</code><sup class="footnote-reference"><a href="#3">3</a></sup>.</p>
+<p>We can program against this interface by parameterizing with a
+type that implements the <code>Cache</code> trait, like so:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">program</span><span style="color:#c0c5ce;">&lt;C: Cache&gt;(</span><span style="color:#bf616a;">cache</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">mut</span><span style="color:#c0c5ce;"> C) -&gt; Option&lt;</span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt; {
+  </span><span style="color:#b48ead;">let mut</span><span style="color:#c0c5ce;"> pipe = C::pipe();
+  pipe.</span><span style="color:#96b5b4;">set</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">hitchiker</span><span style="color:#c0c5ce;">&quot;, </span><span style="color:#d08770;">42</span><span style="color:#c0c5ce;">);
+  pipe.</span><span style="color:#96b5b4;">get</span><span style="color:#c0c5ce;">(&quot;</span><span style="color:#a3be8c;">adel</span><span style="color:#c0c5ce;">&quot;);
+  cache.</span><span style="color:#96b5b4;">query</span><span style="color:#c0c5ce;">(pipe)
+}
+</span></code></pre>
+<p>Before we can actually execute this program we need to implement <code>Cache</code> first.
+First the Redis implementation:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">use </span><span style="color:#c0c5ce;">redis::{Connection, Pipeline as RedisPipeline, PipelineCommands};
+
+</span><span style="color:#b48ead;">impl </span><span style="color:#c0c5ce;">Pipeline </span><span style="color:#b48ead;">for </span><span style="color:#c0c5ce;">RedisPipeline {
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">key</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">) {
+    PipelineCommands::get(</span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, key.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">());
+  }
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">set</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">key</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">value</span><span style="color:#c0c5ce;">: </span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">) {
+    PipelineCommands::set(</span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, key.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">(), value);
+  }
+}
+
+</span><span style="color:#b48ead;">pub struct </span><span style="color:#c0c5ce;">RedisInfo {
+  </span><span style="color:#bf616a;">connection</span><span style="color:#c0c5ce;">: Connection,
+}
+
+</span><span style="color:#b48ead;">impl </span><span style="color:#c0c5ce;">Cache </span><span style="color:#b48ead;">for </span><span style="color:#c0c5ce;">RedisInfo {
+  </span><span style="color:#b48ead;">type </span><span style="color:#c0c5ce;">Pipe = RedisPipeline;
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">pipe</span><span style="color:#c0c5ce;">() -&gt; RedisPipeline {
+    redis::pipe()
+  }
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">query</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">pipe</span><span style="color:#c0c5ce;">: RedisPipeline) -&gt; Option&lt;</span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt; {
+    </span><span style="color:#65737e;">// Generally we should do something smarter here
+    // but glossing over that to simplify the post
+</span><span style="color:#c0c5ce;">    pipe.</span><span style="color:#96b5b4;">query</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">.connection).</span><span style="color:#96b5b4;">ok</span><span style="color:#c0c5ce;">()
+  }
+}
+</span></code></pre>
+<p>Alternatively, we could implement it with a <code>HashMap</code> which would not
+actually have pipelining since everything is in-memory, but could be
+useful for testing and inspecting the pipelined payload.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">pub enum </span><span style="color:#c0c5ce;">Ops {
+  Get { key: String },
+  Set { key: String, value: </span><span style="color:#b48ead;">i32 </span><span style="color:#c0c5ce;">},
+}
+
+</span><span style="color:#b48ead;">impl </span><span style="color:#c0c5ce;">Pipeline </span><span style="color:#b48ead;">for </span><span style="color:#c0c5ce;">Vec&lt;Ops&gt; {
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">get</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">key</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">) {
+    </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">push</span><span style="color:#c0c5ce;">(Ops::Get { key: key.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">() })
+  }
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">set</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">key</span><span style="color:#c0c5ce;">: &amp;</span><span style="color:#b48ead;">str</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">value</span><span style="color:#c0c5ce;">: </span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">) {
+    </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">push</span><span style="color:#c0c5ce;">(Ops::Set { key: key.</span><span style="color:#96b5b4;">to_string</span><span style="color:#c0c5ce;">(), value })
+  }
+}
+
+</span><span style="color:#b48ead;">impl </span><span style="color:#c0c5ce;">Cache </span><span style="color:#b48ead;">for </span><span style="color:#c0c5ce;">HashMap&lt;String, </span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt; {
+  </span><span style="color:#b48ead;">type </span><span style="color:#c0c5ce;">Pipe = Vec&lt;Ops&gt;;
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">pipe</span><span style="color:#c0c5ce;">() -&gt; Vec&lt;Ops&gt; {
+    Vec::new()
+  }
+
+  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">query</span><span style="color:#c0c5ce;">(&amp;</span><span style="color:#b48ead;">mut </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">pipe</span><span style="color:#c0c5ce;">: Vec&lt;Ops&gt;) -&gt; Option&lt;</span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt; {
+    pipe.</span><span style="color:#96b5b4;">iter</span><span style="color:#c0c5ce;">().</span><span style="color:#96b5b4;">fold</span><span style="color:#c0c5ce;">(None, |_, </span><span style="color:#bf616a;">op</span><span style="color:#c0c5ce;">| {
+      </span><span style="color:#b48ead;">match</span><span style="color:#c0c5ce;"> op {
+        Ops::Get { key } =&gt; </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">get</span><span style="color:#c0c5ce;">(key).</span><span style="color:#96b5b4;">map</span><span style="color:#c0c5ce;">(|</span><span style="color:#bf616a;">i</span><span style="color:#c0c5ce;">| i.</span><span style="color:#96b5b4;">clone</span><span style="color:#c0c5ce;">()),
+        Ops::Set { key, value } =&gt; {
+          </span><span style="color:#bf616a;">self</span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">insert</span><span style="color:#c0c5ce;">(key.</span><span style="color:#96b5b4;">clone</span><span style="color:#c0c5ce;">(), value.</span><span style="color:#96b5b4;">clone</span><span style="color:#c0c5ce;">());
+          None
+        }
+      }
+    })
+  }
+}
+</span></code></pre>
+<p>Finally, we can actually run our program with either implementation
+serving as the backend.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">use </span><span style="color:#c0c5ce;">redis::{Client, Connection};
+
+</span><span style="color:#65737e;">// Redis backend
+</span><span style="color:#b48ead;">let</span><span style="color:#c0c5ce;"> client = Client::open(&quot;</span><span style="color:#a3be8c;">redis://127.0.0.1/</span><span style="color:#c0c5ce;">&quot;).</span><span style="color:#96b5b4;">unwrap</span><span style="color:#c0c5ce;">();
+</span><span style="color:#b48ead;">let mut</span><span style="color:#c0c5ce;"> redis = RedisInfo { connection: client.</span><span style="color:#96b5b4;">get_connection</span><span style="color:#c0c5ce;">().</span><span style="color:#96b5b4;">unwrap</span><span style="color:#c0c5ce;">() };
+program::&lt;RedisInfo&gt;(&amp;</span><span style="color:#b48ead;">mut</span><span style="color:#c0c5ce;"> redis);
+
+</span><span style="color:#65737e;">// HashMap backend
+</span><span style="color:#b48ead;">let mut</span><span style="color:#c0c5ce;"> cache = HashMap::new();
+program::&lt;HashMap&lt;String, </span><span style="color:#b48ead;">i32</span><span style="color:#c0c5ce;">&gt;&gt;(&amp;</span><span style="color:#b48ead;">mut</span><span style="color:#c0c5ce;"> cache);
+</span></code></pre>
+<p>And there we have it: a program that is parameterized by an abstract,
+pipeline-supported <code>Cache</code>, two implementations of that cache, both of
+which can be seamlessly plugged in. Existential types are pretty cool
+(and underrated).</p>
+<div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
+<p>Getting close though! See: <a href="https://github.com/rust-lang/rfcs/pull/1598">https://github.com/rust-lang/rfcs/pull/1598</a>.
+<sup class="footnote-reference"><a href="#2">2</a></sup>: Obligatory <a href="https://youtu.be/GqmsQeSzMdw">Constraints Liberate, Liberties Constrain</a>.
+<sup class="footnote-reference"><a href="#3">3</a></sup>: This is not the best type signature for the method as the <code>Option</code> return
+type is dynamic whereas statically we should know if it is a <code>Some</code>
+(last operation was a <code>get</code>) or <code>None</code> (last operation was a <code>set</code>). This
+choice was made purely to simplify the presentation of this blog post.
+I'm sorry.</p>
+</div>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date">10 December 2018</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>Setting up per-project RLS for Emacs with Nix and Direnv</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>Setting up per-project RLS for Emacs with Nix and Direnv</h1>
+    </header>
+    <div class="content">
+        <p>One of my favorite things about <a href="https://nixos.org/nix/">Nix</a> is using the nix-shell to provision the development tooling for a project
+without infecting the rest of the system. Even if the project itself isn't built with Nix, I will often have a
+<code>shell.nix</code> just to provision tools like <a href="https://github.com/rust-lang/cargo">Cargo</a> and <a href="https://www.scala-sbt.org/">SBT</a>. This becomes especially helpful with Rust
+where each of my Rust projects can have a different <code>rustc</code> version without needing to switch my <a href="https://rustup.rs/">rustup</a> toolchain.</p>
+<span id="continue-reading"></span>
+<p>To that effect, I've setup my Emacs to use the Direnv integration <a href="https://github.com/wbolster/emacs-direnv">emacs-direnv</a> to provision the buffer's environment using the project's
+Nix shell whenever I open a file in that project --- if you're not familiar with Direnv I encourage you to
+read about it <a href="https://github.com/direnv/direnv/">here</a>. That combined with Emacs <a href="https://langserver.org/">Language Server Protocol</a> (LSP) integration via <a href="https://github.com/emacs-lsp/lsp-mode">lsp-mode</a> and
+the <a href="https://github.com/rust-lang/rls">Rust Language Server</a> (RLS) and I've got a setup that allows me to switch between Rust projects using
+varying Rust versions without hassle.</p>
+<p>This setup took a bit of fiddling to work so I thought I'd share it here for the public and to document for myself so I don't forget.</p>
+<h2 id="setting-up-emacs">Setting up Emacs</h2>
+<p>The core plugins I use to get this setup working are direnv, lsp-mode, lsp-ui, and company-lsp. <strong>For direnv, besides installing
+the Emacs plugin, make sure to install Direnv itself on your system as well.</strong> For the LSP plugins, I've setup my Emacs to use
+&quot;recent&quot; versions of the plugins since LSP integration is ever-evolving ---  I haven't bothered to test what the
+oldest working versions of these plugins are, but at time of writing the versions I'm using are <code>20191016.1813</code> for lsp-mode,
+<code>20191016.1644</code> for lsp-ui, and <code>20190612.1553</code> for company-lsp. For those managing their Emacs plugins with Nix,
+you can try doing what I do in <a href="https://github.com/adelbertc/dotfiles/blob/0840e5f3060f61f199f9431765dec307df6b0c6e/nixpkgs/.config/nixpkgs/overlays/emacs.nix">my Emacs Nix overlay</a> to get versions newer than upstream Nixpkgs may provide.</p>
+<p>From there my Emacs setup is largely taken from the <a href="https://scalameta.org/metals/docs/editors/emacs.html">Metals</a> (Scala Language Server) Emacs tutorial, with some
+additions to hook in direnv.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">(use-package direnv
+  :init
+  (add-hook &#39;prog-mode-hook #&#39;direnv-update-environment)
+  :config
+  (direnv-mode))
+  
+(use-package company-lsp
+  :defer t)
+
+(use-package lsp-mode
+  :after (direnv evil)
+  :config
+  ; We want LSP
+  (setq lsp-prefer-flymake nil)
+  ; Optional, I don&#39;t like this feature
+  (setq lsp-enable-snippet nil)
+  ; LSP will watch all files in the project
+  ; directory by default, so we eliminate some
+  ; of the irrelevant ones here, most notable
+  ; the .direnv folder which will contain *a lot*
+  ; of Nix-y noise we don&#39;t want indexed.
+  (setq lsp-file-watch-ignored &#39;(
+    &quot;[/\\\\]\\.direnv$&quot;
+    ; SCM tools
+    &quot;[/\\\\]\\.git$&quot;
+    &quot;[/\\\\]\\.hg$&quot;
+    &quot;[/\\\\]\\.bzr$&quot;
+    &quot;[/\\\\]_darcs$&quot;
+    &quot;[/\\\\]\\.svn$&quot;
+    &quot;[/\\\\]_FOSSIL_$&quot;
+    ; IDE tools
+    &quot;[/\\\\]\\.idea$&quot;
+    &quot;[/\\\\]\\.ensime_cache$&quot;
+    &quot;[/\\\\]\\.eunit$&quot;
+    &quot;[/\\\\]node_modules$&quot;
+    &quot;[/\\\\]\\.fslckout$&quot;
+    &quot;[/\\\\]\\.tox$&quot;
+    &quot;[/\\\\]\\.stack-work$&quot;
+    &quot;[/\\\\]\\.bloop$&quot;
+    &quot;[/\\\\]\\.metals$&quot;
+    &quot;[/\\\\]target$&quot;
+    ; Autotools output
+    &quot;[/\\\\]\\.deps$&quot;
+    &quot;[/\\\\]build-aux$&quot;
+    &quot;[/\\\\]autom4te.cache$&quot;
+    &quot;[/\\\\]\\.reference$&quot;)))
+</span></code></pre><h2 id="setting-up-the-project">Setting up the project</h2>
+<p>Once Emacs is ready to roll we need a <code>shell.nix</code> to provision an environment with Nix and
+an <code>.envrc</code> to tell direnv to use said <code>shell.nix</code> when entering the project.</p>
+<p>While Nixpkgs has <a href="https://nixos.org/nixpkgs/manual/#rust">some Rust integration</a>, it does not provide many knobs for us
+to turn in terms of the Rust environment we want, like the compiler version or toolchain
+extensions like <code>rust-src</code>. Thankfully, the kind folks at Mozilla published a
+<a href="https://github.com/mozilla/nixpkgs-mozilla">Nix overlay</a> that makes it much more ergonomic to work with Rust in Nix.</p>
+<p>Most of the <code>shell.nix</code> then is boilerplate to pull and setup this overlay. From there
+it's just a matter of specifying the Rust version we want, along with the extensions we want
+for RLS.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">let
+  </span><span style="color:#d08770;">rust-version </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">1.40.0</span><span style="color:#c0c5ce;">&quot;;
+
+  </span><span style="color:#d08770;">nixpkgs </span><span style="color:#c0c5ce;">= </span><span style="color:#bf616a;">fetchGit </span><span style="color:#c0c5ce;">{
+    </span><span style="color:#d08770;">url </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">https://github.com/NixOS/nixpkgs.git</span><span style="color:#c0c5ce;">&quot;;
+    </span><span style="color:#d08770;">rev </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">a3070689aef665ba1f5cc7903a205d3eff082ce9</span><span style="color:#c0c5ce;">&quot;;
+    </span><span style="color:#d08770;">ref </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">release-19.09</span><span style="color:#c0c5ce;">&quot;;
+  };
+
+  </span><span style="color:#d08770;">mozilla-overlay </span><span style="color:#c0c5ce;">=
+    </span><span style="color:#96b5b4;">import </span><span style="color:#c0c5ce;">(</span><span style="color:#d08770;">builtins</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">fetchTarball </span><span style="color:#a3be8c;">https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz</span><span style="color:#c0c5ce;">);
+
+  </span><span style="color:#d08770;">pkgs </span><span style="color:#c0c5ce;">= </span><span style="color:#96b5b4;">import </span><span style="color:#bf616a;">nixpkgs </span><span style="color:#c0c5ce;">{
+    </span><span style="color:#d08770;">overlays </span><span style="color:#c0c5ce;">= [ </span><span style="color:#bf616a;">mozilla-overlay </span><span style="color:#c0c5ce;">];
+  };
+
+  </span><span style="color:#d08770;">rust-channel </span><span style="color:#c0c5ce;">= </span><span style="color:#bf616a;">pkgs</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">rustChannelOf </span><span style="color:#c0c5ce;">{
+    </span><span style="color:#d08770;">channel </span><span style="color:#c0c5ce;">= </span><span style="color:#bf616a;">rust-version</span><span style="color:#c0c5ce;">;
+  };
+
+  </span><span style="color:#d08770;">rust </span><span style="color:#c0c5ce;">= </span><span style="color:#bf616a;">rust-channel</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">rust</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">override </span><span style="color:#c0c5ce;">{
+    </span><span style="color:#d08770;">extensions </span><span style="color:#c0c5ce;">= [ &quot;</span><span style="color:#a3be8c;">rust-src</span><span style="color:#c0c5ce;">&quot; ];
+  };
+
+  </span><span style="color:#d08770;">cargo </span><span style="color:#c0c5ce;">= </span><span style="color:#bf616a;">rust-channel</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">cargo</span><span style="color:#c0c5ce;">;
+</span><span style="color:#b48ead;">in
+  </span><span style="color:#bf616a;">pkgs</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">mkShell </span><span style="color:#c0c5ce;">{
+    </span><span style="color:#d08770;">name </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">rust-dev</span><span style="color:#c0c5ce;">&quot;;
+    </span><span style="color:#d08770;">buildInputs </span><span style="color:#c0c5ce;">= [ </span><span style="color:#bf616a;">rust cargo </span><span style="color:#c0c5ce;">];
+  }
+</span></code></pre>
+<p>As for the <code>.envrc</code>, Direnv comes with <a href="https://github.com/direnv/direnv/wiki/Nix">Nix bindings</a> so all we need in
+that file is:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#bf616a;">use_nix
+</span></code></pre>
+<p>Now we just need to <code>direnv allow</code> to whitelist the project for Direnv,
+open a file in the project, and reap the rewards --- you should see a little
+&quot;LSP :: Connected to [rls:XXX status:starting]&quot; diagnostic in the
+minibuffer indicating great success. There may be some lag when you open the project
+for the first time as Nix is pulling the dependencies, or before any diagnostics appear as
+RLS is working in the background to download Rust dependencies and compiling the project. To
+make the former a bit more tolerable, I will run <code>nix-shell</code> in a terminal outside of
+Emacs so I can actually see the download progress instead of staring at a locked Emacs session.
+For the latter, lsp-mode and RLS have the <code>lsp-log</code>, <code>rls</code>, and <code>rls::stderr</code> buffers you can
+open to see progress or debug any issues you may encounter.</p>
+<h2 id="other-languages">Other languages</h2>
+<p>Much of this setup translates readily to other languages or other Emacs language modes. Likely
+all you will need to do is get a <code>shell.nix</code> that provisions the correct environment with any
+tools your language mode needs and you're off to the races. Keep in mind though that some languages
+(e.g. Scala) and their corresponding language servers (e.g. SBT + Metals) already have native support
+for project-specific compiler versions so the only win you may get from mimicking this setup in
+those cases is consistency.</p>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date"> 6 January 2020</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/nix/">#nix</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
