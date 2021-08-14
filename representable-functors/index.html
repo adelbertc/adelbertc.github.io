@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>Reasoning with representable functors</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>Reasoning with representable functors</h1>
+    </header>
+    <div class="content">
+        <p>A couple weeks ago I was working on a project using Conal Elliott's <a href="https://hackage.haskell.org/package/uniform-pair">uniform-pair</a> library and
+noticed it had a curious <code>Monad</code> instance, which I've reproduced below.</p>
+<span id="continue-reading"></span><pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">data </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a a
+
+</span><span style="color:#b48ead;">instance Monad Pair where</span><span style="color:#c0c5ce;">
+  return a = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a a
+
+  m &gt;&gt;= f = joinP (f &lt;$&gt; m)
+
+</span><span style="color:#8fa1b3;">joinP </span><span style="color:#b48ead;">:: Pair</span><span style="color:#c0c5ce;"> (</span><span style="color:#b48ead;">Pair </span><span style="color:#bf616a;">a</span><span style="color:#c0c5ce;">) </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">a
+</span><span style="color:#c0c5ce;">joinP (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a _) (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> _ d)) = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a d
+</span></code></pre>
+<p>I was especially curious about why <code>joinP</code> chose the first element of the first pair and the second element of
+the second pair. My initial guess was that it was determined by the <code>Functor</code> instance which would've looked something
+like..</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#8fa1b3;">fmapP </span><span style="color:#b48ead;">::</span><span style="color:#c0c5ce;"> (</span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">b</span><span style="color:#c0c5ce;">) </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">b
+</span><span style="color:#c0c5ce;">fmapP f (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (f x) (f y)
+</span></code></pre>
+<p>For <code>Monad</code> to be consistent with <code>Functor</code> the follow equation should hold..</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">fmapP f p = p &gt;&gt;= (return . f)
+</span></code></pre>
+<p>..but this didn't really help.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">(</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) &gt;&gt;= (return . f)
+  = joinP ((return . f) &lt;$&gt; </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y)
+  = joinP (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (f x) (f y)) (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (f x) (f y)))
+</span></code></pre>
+<p>Taking either element of the outer pair would've been consistent with the <code>Functor</code> instance, as would taking the first
+element of the first pair and the second element of the second pair.</p>
+<p>A couple days later I was talking with Conal about it and he hinted at using the fact that uniform pairs are
+<a href="https://ncatlab.org/nlab/show/representable+functor">representable functors</a>. For a functor to be representable in Haskell<sup class="footnote-reference"><a href="#1">1</a></sup> means it is isomorphic to
+the set of functions from <code>X</code>, for some fixed <code>X</code> (this &quot;set of functions from X&quot; is also known as the reader monad).
+For uniform pairs, <code>X = Bool</code>. Indeed, the following functions are mutual inverses.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#8fa1b3;">to </span><span style="color:#b48ead;">:: Pair </span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; Bool -&gt; </span><span style="color:#bf616a;">a
+</span><span style="color:#c0c5ce;">to (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x _) </span><span style="color:#d08770;">False </span><span style="color:#c0c5ce;">= x
+to (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> _ y) </span><span style="color:#d08770;">True  </span><span style="color:#c0c5ce;">= y
+
+</span><span style="color:#8fa1b3;">from </span><span style="color:#b48ead;">::</span><span style="color:#c0c5ce;"> (</span><span style="color:#b48ead;">Bool -&gt; </span><span style="color:#bf616a;">a</span><span style="color:#c0c5ce;">) </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">a
+</span><span style="color:#c0c5ce;">from f = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (f </span><span style="color:#d08770;">False</span><span style="color:#c0c5ce;">) (f </span><span style="color:#d08770;">True</span><span style="color:#c0c5ce;">)
+</span></code></pre>
+<p>To prove that a functor <code>f</code> is representable in Haskell is to implement the <code>Representable</code> type class. The
+following is reproduced from the <a href="https://hackage.haskell.org/package/representable-functors">representable-functors</a> package.</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#b48ead;">class </span><span style="color:#a3be8c;">Representable </span><span style="color:#bf616a;">f </span><span style="color:#b48ead;">where
+  </span><span style="color:#8fa1b3;">index </span><span style="color:#b48ead;">:: </span><span style="color:#bf616a;">f a </span><span style="color:#b48ead;">-&gt; Key </span><span style="color:#bf616a;">f </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">a
+
+  </span><span style="color:#8fa1b3;">tabulate </span><span style="color:#b48ead;">::</span><span style="color:#c0c5ce;"> (</span><span style="color:#b48ead;">Key </span><span style="color:#bf616a;">f </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">a</span><span style="color:#c0c5ce;">) </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">f a
+</span></code></pre>
+<p>The <code>Key f</code> refers to the fixed <code>X</code> mentioned above, so <code>Key Pair = Bool</code>. Substituing <code>Bool</code> for <code>Key f</code> reveals
+signatures matching the <code>to</code> (<code>index</code>) and <code>from</code> (<code>tabulate</code>) functions<sup class="footnote-reference"><a href="#2">2</a></sup>.</p>
+<p>As it turns out every <code>Representable</code> has a canonical monadic return and bind, defined as:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#8fa1b3;">returnRep </span><span style="color:#b48ead;">:: Representable </span><span style="color:#bf616a;">f </span><span style="color:#b48ead;">=&gt; </span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">f a
+</span><span style="color:#c0c5ce;">returnRep = tabulate . const
+
+</span><span style="color:#8fa1b3;">bindRep </span><span style="color:#b48ead;">:: Representable </span><span style="color:#bf616a;">f </span><span style="color:#b48ead;">=&gt; </span><span style="color:#bf616a;">f a </span><span style="color:#b48ead;">-&gt;</span><span style="color:#c0c5ce;"> (</span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">f b</span><span style="color:#c0c5ce;">) </span><span style="color:#b48ead;">-&gt; </span><span style="color:#bf616a;">f b
+</span><span style="color:#c0c5ce;">bindRep m f = tabulate (\a -&gt; index (f (index m a)) a)
+</span></code></pre>
+<p>Let's see what this looks like for <code>Pair</code>. First let's do some substitution on <code>returnRep</code>:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#8fa1b3;">returnRep </span><span style="color:#b48ead;">:: </span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">a
+</span><span style="color:#c0c5ce;">returnRep a
+  = (tabulate . const) a
+  = tabulate (const a)
+  = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (const a </span><span style="color:#d08770;">False</span><span style="color:#c0c5ce;">) (const a </span><span style="color:#d08770;">True</span><span style="color:#c0c5ce;">) </span><span style="color:#65737e;">-- Pair&#39;s tabulate = from
+  </span><span style="color:#c0c5ce;">= </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a a
+</span></code></pre>
+<p>That matches our <code>return</code> definition above. Now let's do the same for <code>bindRep</code>:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#8fa1b3;">bindRep </span><span style="color:#b48ead;">:: Pair </span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt;</span><span style="color:#c0c5ce;"> (</span><span style="color:#bf616a;">a </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">b</span><span style="color:#c0c5ce;">) </span><span style="color:#b48ead;">-&gt; Pair </span><span style="color:#bf616a;">b
+</span><span style="color:#c0c5ce;">bindRep (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) f
+  = tabulate (\a -&gt; index (f (index (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) a)) a)
+  = tabulate g              </span><span style="color:#65737e;">-- call the lambda &#39;g&#39;
+  </span><span style="color:#c0c5ce;">= </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> (g </span><span style="color:#d08770;">False</span><span style="color:#c0c5ce;">) (g </span><span style="color:#d08770;">True</span><span style="color:#c0c5ce;">) </span><span style="color:#65737e;">-- Pair&#39;s tabulate = from
+</span></code></pre>
+<p>Now substituting <code>False</code> and <code>True</code> into the lambda:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#65737e;">-- g False
+  </span><span style="color:#c0c5ce;">= index (f (index (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) </span><span style="color:#d08770;">False</span><span style="color:#c0c5ce;">)) </span><span style="color:#d08770;">False
+  </span><span style="color:#c0c5ce;">= index (f x) </span><span style="color:#d08770;">False     </span><span style="color:#65737e;">-- Pair&#39;s index = to
+  </span><span style="color:#c0c5ce;">= first element </span><span style="color:#b48ead;">of</span><span style="color:#c0c5ce;"> f x  </span><span style="color:#65737e;">-- Pair&#39;s index = to
+
+-- g True
+  </span><span style="color:#c0c5ce;">= index (f (index (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) </span><span style="color:#d08770;">True</span><span style="color:#c0c5ce;">)) </span><span style="color:#d08770;">True
+  </span><span style="color:#c0c5ce;">= index (f y) </span><span style="color:#d08770;">True      </span><span style="color:#65737e;">-- Pair&#39;s index = to
+  </span><span style="color:#c0c5ce;">= second element </span><span style="color:#b48ead;">of</span><span style="color:#c0c5ce;"> f y </span><span style="color:#65737e;">-- Pair&#39;s index = to
+</span></code></pre>
+<p>Thus:</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">bindRep (</span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> x y) f
+  = </span><span style="color:#d08770;">Pair</span><span style="color:#c0c5ce;"> a d </span><span style="color:#65737e;">-- where Pair (Pair a _) (Pair _ d)
+--                          ^ f x      ^ f y
+</span></code></pre>
+<p>The same as <code>joinP</code> above.</p>
+<p>This is awesome. By starting with the <em>meaning</em> of his data type, Conal discovered the only
+natural type class instance consistent with the meaning. While in this case I started with the instance and worked
+my way back, I believe the more useful and consistent approach is to think hard about your data type's
+<a href="http://conal.net/papers/type-class-morphisms/">denotation</a> and work your way forward.</p>
+<div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
+<p>Specifically I mean the $Hask$ category with types as objects and functions as arrows.</p>
+</div>
+<div class="footnote-definition" id="2"><sup class="footnote-definition-label">2</sup>
+<p>In general the type class law for <code>Representable</code> requires <code>index</code> and <code>tabulate</code> to be mutual inverses.</p>
+</div>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date"> 9 August 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

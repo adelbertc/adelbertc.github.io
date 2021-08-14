@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>Adelblog</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a class="active" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+                
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;emacs-rls-nix&#x2F;">Setting up per-project RLS for Emacs with Nix and Direnv</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>One of my favorite things about <a href="https://nixos.org/nix/">Nix</a> is using the nix-shell to provision the development tooling for a project
+without infecting the rest of the system. Even if the project itself isn't built with Nix, I will often have a
+<code>shell.nix</code> just to provision tools like <a href="https://github.com/rust-lang/cargo">Cargo</a> and <a href="https://www.scala-sbt.org/">SBT</a>. This becomes especially helpful with Rust
+where each of my Rust projects can have a different <code>rustc</code> version without needing to switch my <a href="https://rustup.rs/">rustup</a> toolchain.</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date"> 6 January 2020</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/nix/">#nix</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;protocols&#x2F;">Stop speaking gibberish, start using interfaces</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>In the age of modular microservices, data pipelines, serverless, and IoT, handling data serialization has become a major
+design decision. While monolithic architectures are well, monolithic, coordination between components is simply a
+function call away. In contrast, components that are separated by a network or run as different stages in a workflow
+must communicate by serializing and deserializing data. Add in questions like how much data is being serialized,
+how often it needs to be serialized, how many languages are in play, and how various components evolve, and we can see
+how data serialization has turned from an incidental problem to a central one.</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date"> 7 January 2019</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/systems/">#systems</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;rust-existentials&#x2F;">Existential types in Rust</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>For the past couple of weeks I have been using <a href="https://www.rust-lang.org/en-US/">Rust</a> for a project at
+work and enjoying it a lot. The emphasis on systems programming
+aligns well with my interest in systems, the unique type system keeps
+the programming languages enthusiast in me interested, and the use of
+expressive types, as always, keeps me in check and makes me confident in my
+code.</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date">10 December 2018</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;end-to-end&#x2F;">Ruminations on the end-to-end argument</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>I spend a lot of my time reading papers and over the years a couple have
+always stuck out to me. For this post I
+wanted to write about an oldie but goodie: Saltzer, Reed, and Clark's
+&quot;<a href="http://people.eecs.berkeley.edu/%7Eprabal/resources/osprelim/SRC84.pdf">End-To-End Arguments in System Design</a>.&quot;</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date">13 August 2018</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/systems/">#systems</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;typeclasses-scala17&#x2F;">The Limitations of Type Classes as Subtyped Implicits at Scala&#x27;17</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>I am excited to say my short paper &quot;The Limitations of Type Classes as Subtyped
+Implicits&quot; has been accepted at Scala Symposium 2017!</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date">20 September 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;installing-nixos&#x2F;">Installing NixOS</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>In an effort to force myself to learn <a href="https://nixos.org/nix/">Nix</a> I spent last weekend installing <a href="https://nixos.org/">NixOS</a> on my desktop. It ended
+up being a fairly involved process for me, especially since I barely have any experience with Linux. Therefore I've
+decided to write about my installation process (to the best of my recollection anyways), both as a reminder to myself
+and for anyone else who may be curious.</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date">13 August 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/nix/">#nix</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;representable-functors&#x2F;">Reasoning with representable functors</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>A couple weeks ago I was working on a project using Conal Elliott's <a href="https://hackage.haskell.org/package/uniform-pair">uniform-pair</a> library and
+noticed it had a curious <code>Monad</code> instance, which I've reproduced below.</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date"> 9 August 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                    
+    <article class="post-list">
+        <header> 
+            <h1>
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;first-nix-derivation&#x2F;">My first Nix derivation</a>
+            </h1>
+        </header>
+
+        
+        <div class="content post-summary">
+            <p>When I started learning Nix I set myself a milestone of contributing a derivation
+to Nixpkgs. Along the way I learned some interesting things about the Nix toolchain
+and began to really appreciate the freedom it gave me to experiment.</p>
+
+        </div>
+        
+        
+        
+    <div class="article-info">
+        
+        <div class="article-date"> 8 April 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/nix/">#nix</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+    </article>
+
+                
+                
+    <div class="pagination">
+        <div class="left pagination-item disabled">
+            
+        </div>
+        <div class="right pagination-item ">
+            
+            <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;page&#x2F;2&#x2F;">To older posts</a>
+            
+        </div>
+    </div>
+
+                
+            
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>Installing NixOS</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>Installing NixOS</h1>
+    </header>
+    <div class="content">
+        <p>In an effort to force myself to learn <a href="https://nixos.org/nix/">Nix</a> I spent last weekend installing <a href="https://nixos.org/">NixOS</a> on my desktop. It ended
+up being a fairly involved process for me, especially since I barely have any experience with Linux. Therefore I've
+decided to write about my installation process (to the best of my recollection anyways), both as a reminder to myself
+and for anyone else who may be curious.</p>
+<span id="continue-reading"></span>
+<p>Being new to Linux and easily sketched out, I tried my best to look up things I didn't understand and will try to
+replicate the explanations I found.</p>
+<p>In terms of resources I consulted I used the <a href="https://nixos.org/nixos/manual/index.html#sec-installation">NixOS manual</a>, <a href="https://chris-martin.org/2015/installing-nixos">Chris Martin's blog post</a>,
+<a href="https://gist.github.com/martijnvermaat/76f2e24d0239470dd71050358b4d5134">Martijn Vermaat's gist</a>, and the extremely helpful <a href="https://wiki.archlinux.org/">ArchWiki</a>.</p>
+<p>This post is based on the NixOS installation I did on August 6, 2017. Things may have changed between then and now.</p>
+<h2 id="goals">Goals</h2>
+<ul>
+<li>NixOS 17.03</li>
+<li>Installing on a completely separate hard drive (I was sketched out by NixOS sharing a hard drive with Windows)</li>
+<li>Desktop, not laptop (but this post should help laptop users as well)</li>
+<li>Create a bootable USB drive from Windows</li>
+<li>UEFI boot (it's apparently the hip new thing)</li>
+<li>Encrypted disk</li>
+</ul>
+<h1 id="the-boring-stuff">The boring stuff</h1>
+<h2 id="creating-a-bootable-usb-drive">Creating a bootable USB drive</h2>
+<ol>
+<li>Download the ISO from the <a href="https://nixos.org/nixos/download.html">NixOS site</a>. I used the &quot;Graphical live CD&quot; because it was marked
+recommended but this post does the install entirely with the console so the &quot;Minimal installation&quot; is probably fine
+as well.</li>
+<li>While the ISO is downloading find a USB drive with enough space for the ISO. Probably something with around 16GB
+of space.</li>
+<li>Download <a href="https://rufus.akeo.ie/">Rufus</a>.</li>
+<li>Once the ISO is downloaded run Rufus. select MBR partitioning scheme for BIOS or UEFI (when I was installing
+I didn't know I was going to decide on UEFI, choosing GPT here should be fine), FAT32 file system, and the default
+cluster size. Select the ISO, check Quick format for good measure, and I probably checked &quot;Create extended label
+and icon files&quot; as well.</li>
+<li>Hit Start to.. start. Rufus might prompt you if you want to use ISO or DD mode, pick DD. At the time of this writing
+the NixOS ISO seems to only like DD, and for non-Windows users the recommended way to mount the image is using <code>dd</code>
+anyways. It may also prompt you about downloading Syslinux files, click yes. It will just download these files in
+the same folder as wherever Rufus was started from, you can delete them after.</li>
+<li>Once it's done, eject the drive and shut down your computer.</li>
+</ol>
+<h2 id="disabling-secure-boot">Disabling Secure Boot</h2>
+<p>If your motherboard has Secure Boot, you'll need to disable it. Consult your motherboard manual on how to do so. I
+had an ASUS Z87-K, and this is what I did:</p>
+<ol>
+<li>Find a USB drive with a bit of space on it (we're going to copy some keys onto it so you don't need that much).</li>
+<li>Shut down the computer and plug the USB drive in.</li>
+<li>Boot back up and spam F2 to go into the UEFI BIOS screen.</li>
+<li>Switch to &quot;Advanced Mode.&quot;</li>
+<li>Click &quot;Boot&quot; on the menu bar.</li>
+<li>Click on &quot;Secure Boot.&quot; Here I could see the &quot;Secure boot state&quot; which was enabled - if it shows up as disabled
+you can skip ahead.</li>
+<li>Click on &quot;Key Mangement.&quot;</li>
+<li>Click &quot;Save Secure Boot Keys&quot; and save it onto your USB drive. Presumably you can use this backup to load the PK
+key which we're about to delete back in if something goes terribly wrong.</li>
+<li>Delete the PK key.</li>
+</ol>
+<p>This should disable Secure Boot.</p>
+<h1 id="the-fun-stuff">The fun stuff</h1>
+<p>If you're paranoid like me, shut down your computer and disconnect everything but the drive you intend to install
+NixOS on.</p>
+<p>NixOS will want to download some stuff during installation so make sure you have an internet connection available.
+If you have a wired connection with DHCP setup then you're good to go. If you have wired but no DHCP, be prepared
+to configure it manually with <code>ifconfig</code>. If you have wireless then refer to another guide (perhaps one of the ones
+I linked above) to set it up when I mention it later in this post.</p>
+<p>Boot up your computer and spam whatever key you need to drop into the boot menu (F8 for me). Select
+the UEFI boot from the USB and run the default NixOS installer. You should be dropped into a shell as <code>root</code>.</p>
+<h2 id="preparing-your-disk">Preparing your disk</h2>
+<p>The <a href="https://nixos.org/nixos/manual/index.html#sec-uefi-installation">NixOS UEFI Installation guide</a> wants a
+GPT-partitioned drive with a UEFI boot partition formatted as a <code>vfat</code> filesystem.</p>
+<p>For the GPT partitioning we're going to use <code>gdisk</code>. Here are some links to read up on <code>gdisk</code> and related tools:</p>
+<ul>
+<li><a href="https://wiki.archlinux.org/index.php/Fdisk"><code>fdisk</code> ArchWiki</a></li>
+<li><a href="http://www.tldp.org/HOWTO/Partition/fdisk_partitioning.html">TLDP's Partitioning with fdisk</a></li>
+<li><a href="http://www.rodsbooks.com/gdisk/walkthrough.html">Rod Smith's &quot;A gdisk Walkthrough&quot;</a></li>
+</ul>
+<p>At the end of this section we'll have a partition table that looks like:</p>
+<p>+--------+------------+------+----------------------+
+| Number |  Size      | Code | Name                 |
++:=======+:===========+:=====+:=====================+
+| 1      | 500 MB     | EF00 | EFI System Partition |
++--------+------------+------+----------------------+
+| 2      | the rest   | 8E00 | Linux LVM            |
++--------+------------+-----------------------------+</p>
+<p>We will only encrypt the Linux LVM partition as the boot process will need to be able to read the EFI
+System Partition before prompting us for the encryption key.</p>
+<p>Chris's post also has a 1 MB EF02 BIOS boot partition, but honestly writes &quot;Don’t ask me exactly what this is for,
+all I know is it has to be there.&quot; Seeing this I dug around and found on the
+<a href="https://wiki.archlinux.org/index.php/GRUB">GRUB ArchWiki</a> page &quot;For UEFI systems [the BIOS boot partition] is not
+required, since no embedding of boot sectors takes place...However, UEFI systems still require an ESP.&quot;
+The <a href="https://wiki.archlinux.org/index.php/Fdisk">Fdisk ArchWiki</a> page then says &quot;GRUB requires a BIOS boot partition with code ef02.&quot; NixOS usually
+gives the option of either using GRUB or systemd-boot, but for the UEFI install it defaults to systemd-boot. When I
+asked on the #nixos IRC channel about UEFI with GRUB, I was told that the two used to not play nicely together. Being
+the generally risk-averse person I am, I opted not to try.</p>
+<p>Now to actually do the partitioning.</p>
+<ol>
+<li>Identify your drive's name with <code>fdisk  -l</code>. Be extremely sure of this because if you have other drives
+connected and you format the wrong one, the data is gone.</li>
+<li>Run <code>gdisk &lt;drive name&gt;</code>, e.g. <code>gdisk /dev/sda</code>.</li>
+<li>Hit <code>p</code> to print the partition table and confirm this is the drive you want to work with.</li>
+<li><code>o</code> to clear any partition table that may have previously been on the drive.</li>
+<li><code>p</code> to verify the table is clear.</li>
+<li><code>n</code> to add a new partition for the EFI System Partition. Use the default for the number and first sector, <code>+500M</code> for
+the last sector, and <code>EF00</code> for the hex code.</li>
+<li><code>n</code> again, now for the Linux LVM partition. Use the default for the number, first, and last sector (it will default
+to fill up the rest of the drive), and <code>8E00</code> for the hex code. Some guides suggest <code>8300</code> for Linux filesystem, I
+decided to use <code>8E00</code> since that's what the
+<a href="https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system">Dm-crypt ArchWiki</a> page suggests for the
+encrypted drive.</li>
+<li><code>p</code> to verify the state of the table.</li>
+<li><code>w</code> to save and apply the changes.</li>
+</ol>
+<p>Once that is done we can encrypt the drive with <a href="https://gitlab.com/cryptsetup/cryptsetup">LUKS</a> and throw a filesystem
+on top.</p>
+<ol>
+<li>At the command line run <code>fdisk -l</code> and identify the names of your EFI System Partition and your Linux LVM partition.
+Write these down as we'll need them in a bit. These should be something like <code>/dev/sda1</code> and <code>/dev/sda2</code>. For me it
+was <code>/dev/sdb1</code> and <code>/dev/sdb2</code>. I'm going to use <code>&lt;boot partition&gt;</code> to indicate the EFI System Partition name and
+<code>&lt;lvm partition&gt;</code> to indicate the Linux LVM partition. Be very careful not to mix these two names up.</li>
+<li><code>cryptsetup luksFormat &lt;lvm partition&gt;</code> to create the LUKS container at the specified partition. You will be
+prompted for the passphrase that will need to be entered whenever your boot into NixOS.</li>
+<li><code>cryptsetup luksOpen &lt;lvm partition&gt; enc-pv</code> to open the encrypted container. The container will then be available
+under <code>/dev/mapper/enc-pv</code>. As far as I can tell the &quot;enc-pv&quot; is just a human-friendly name, I have
+seen other guides call this <code>crypted</code> or <code>cryptroot</code>. I use <code>enc-pv</code> because that's what the guides I was following
+used and I'm paranoid.</li>
+<li><code>pvcreate /dev/mapper/enc-pv</code> to create a physical volume on the partition.</li>
+<li><code>vgcreate vg /dev/mapper/enc-pv</code> to create a volume group.</li>
+<li><code>lvcreate -L &lt;# of GB of swap space you want&gt;G -n swap vg</code> to create swap space. I wasn't sure how much to put here
+and some preliminary searching led to long arguments about why an apparently old rule of 2 x (amount of RAM) is no
+longer necessary. I was lazy so I just put 16G, but you may want to put more thought into this than I.</li>
+<li><code>lvcreate -l '100%FREE' -n root vg</code> to allocate the rest of the partition for your root filesystem.</li>
+<li><code>mkfs.vfat -n BOOT &lt;boot partition&gt;</code> (not the LVM partition!!!) to format the boot partition, giving it a label
+of &quot;BOOT.&quot;</li>
+<li>I'm going to format the root filesystem at ext4 since that's what the cool kids seem to use. If you want something
+else do your thing here. For ext4, <code>mkfs.ext4 -L root /dev/vg/root</code>. This also gives it the label &quot;root.&quot;</li>
+<li><code>mkswap -L swap /dev/vg/swap</code> to setup and name the swap.</li>
+<li>Now we mount the partitions. We're going to mount at <code>/mnt</code> since that's what NixOS manual says to do.
+<code>mount /dev/vg/root /mnt</code> to mount the root filesystem.</li>
+<li><code>mkdir /mnt/boot</code></li>
+<li><code>mount &lt;boot partition&gt; /mnt/boot</code></li>
+<li><code>swapon /dev/vg/swap</code> to activate swap.</li>
+</ol>
+<h2 id="installing-nixos">Installing NixOS</h2>
+<p>Finally, let's generate the NixOS configuration files and get this show on the road.</p>
+<ol>
+<li><code>nixos-generate-config --root /mnt</code>. This will generate two configuration files under <code>/mnt/etc/nixos</code>,
+<code>configuration.nix</code> which will hold the configuration for your whole system and what you will probably be changing
+not unfrequently, and <code>hardware-configuration.nix</code> which you probably shouldn't touch.</li>
+<li>We're going to need to refer to the LVM partition in a reliable way later, so run <code>blkid &lt;lvm partition&gt;</code> and write
+down the UUID associated with it.</li>
+<li>If you intend on using a wireless internet connection, this is about the time you should refer to another guide to
+get WiFi setup. If you're using wired without DHCP, make sure you have that setup as well.</li>
+<li>Before booting into NixOS proper we need to tell it to expect an encrypted partition. Use <code>vim</code> or <code>nano</code> or
+something to open and edit <code>/mnt/etc/nixos/configuration.nix</code>.</li>
+<li>Add the following somewhere in the file:</li>
+</ol>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#bf616a;">boot</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">initrd</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">luks</span><span style="color:#c0c5ce;">.</span><span style="color:#bf616a;">devices </span><span style="background-color:#bf616a;color:#2b303b;">=</span><span style="color:#c0c5ce;"> [
+  {
+    </span><span style="color:#d08770;">name </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">root</span><span style="color:#c0c5ce;">&quot;;
+    </span><span style="color:#d08770;">device </span><span style="color:#c0c5ce;">= &quot;</span><span style="color:#a3be8c;">/dev/disk/by-uuid/&lt;the aforementioned UUID here&gt;</span><span style="color:#c0c5ce;">&quot;;
+    </span><span style="color:#d08770;">preLVM </span><span style="color:#c0c5ce;">= </span><span style="color:#d08770;">true</span><span style="color:#c0c5ce;">;
+  }
+]</span><span style="background-color:#bf616a;color:#2b303b;">;</span><span style="color:#c0c5ce;">
+</span></code></pre>
+<p>When I first did this I just put my LVM partition name under <code>device</code>, something like <code>device = /dev/sda2</code>. After I
+shut down my computer, reconnected my other hard drive, and rebooted my machine, NixOS complained about <code>/dev/sda2</code>
+being wonky. Apparently the names assigned to drives can vary across boots, and it's not surprising connecting another
+drive can mess with how names are chosen. Therefore instead of referring to the root filesystem by name in the
+configuration we use the more reliable UUID.</p>
+<ol start="6">
+<li>Somewhere you should also see <code>boot.loader.systemd-boot.enable = true</code>. When I mentioned earlier that NixOS UEFI
+defaults to systemd-boot, this is what I was referring to.</li>
+<li>Save the file, and run <code>nixos-install</code> to apply the configuration. This will pull a bunch of packages down from
+upstream and do the Nix thing to get everything setup. If everything is OK it should prompt you for a password to
+use for root in your newly installed NixOS. If something went wrong it'll stop and you just need to edit the
+configuration file again to fix your mistake.</li>
+<li><code>reboot</code> to reboot into your installed NixOS! Hopefully your boot order is configured so this just works, otherwise
+you may have to drop into the boot menu again to select the right drive.</li>
+<li>You should be prompted for your LUKS passphrase on startup, followed by your username and password. Use <code>root</code> and
+the password you chose in the previous step. If you are instead greeted with an error jump to the paragraph after
+this section.</li>
+<li>You're done! You can now start following step 14 of the
+<a href="https://nixos.org/nixos/manual/index.html#ch-installation">NixOS installation guide</a> or do your own thing.</li>
+</ol>
+<p>If your NixOS boot does not work, you mess up, or need to reboot for any reason, just boot from your USB drive in
+UEFI mode like before. To re-setup everything so you can fix the NixOS configuration:</p>
+<ol>
+<li>Use <code>fdisk -l</code> to identify your boot partition and LVM  partition name.</li>
+<li><code>cryptsetup luksOpen &lt;lvm partition&gt; enc-pv</code> (or whatever friendly name you chose earlier).</li>
+<li><code>lvchange -a y /dev/vg/swap</code></li>
+<li><code>lvchange -a y /dev/vg/root</code></li>
+<li><code>mount /dev/vg/root /mnt</code></li>
+<li><code>mount &lt;boot partition&gt; /mnt/boot</code></li>
+<li><code>swapon /dev/vg/swap</code></li>
+</ol>
+<p>You should then be able to edit <code>/mnt/etc/nixos/configuration.nix</code> as before.</p>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date">13 August 2017</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/nix/">#nix</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

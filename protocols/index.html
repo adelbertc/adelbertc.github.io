@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>Stop speaking gibberish, start using interfaces</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;main.css">
+
+    
+        <link rel="alternate" type="application/atom+xml" title="RSS" href="https://www.adelbertc.com/atom.xml">
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Adelblog</a>
+            </h1>
+            <nav>
+                
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;">Home</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;about">About</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;assets&#x2F;adelbertchang_resume.pdf">Resume</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;publications">Publications</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;tags">Tags</a>
+                
+                
+                <a  href="https:&#x2F;&#x2F;www.adelbertc.com&#x2F;&#x2F;atom.xml">Atom</a>
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>Stop speaking gibberish, start using interfaces</h1>
+    </header>
+    <div class="content">
+        <p>In the age of modular microservices, data pipelines, serverless, and IoT, handling data serialization has become a major
+design decision. While monolithic architectures are well, monolithic, coordination between components is simply a
+function call away. In contrast, components that are separated by a network or run as different stages in a workflow
+must communicate by serializing and deserializing data. Add in questions like how much data is being serialized,
+how often it needs to be serialized, how many languages are in play, and how various components evolve, and we can see
+how data serialization has turned from an incidental problem to a central one.</p>
+<span id="continue-reading"></span>
+<p>One approach to this problem is to use language-native serialization like <a href="https://docs.oracle.com/javase/tutorial/jndi/objects/serial.html%3CPaste%3E">Java serialization</a>
+or <a href="https://docs.python.org/3/library/pickle.html">Python pickling</a>. So long as we are using the same language, this has the benefit of being convenient
+and easy to use. It is common to see systems like <a href="https://spark.apache.org/">Apache Spark</a> rely heavily on native serialization to handle
+communication within the system. However once we need to consider other factors like using multiple languages or
+evolving the serialization scheme, such mechanisms are quickly ruled out.</p>
+<p>Another approach that much of the industry has converged on is to use <a href="https://json.org/">JSON</a>. JSON is human readable, relatively
+simple, language agnostic, and widespread enough that most languages have a JSON library (some even in the standard
+library). For these reasons a vast amount of public APIs and microservices today have adopted JSON as their main data
+format. However JSON suffers from a big problem (as does language-native serialization): it is unchecked.</p>
+<p>When a client sends a request to or receives a response from a server, it needs to serialize or deserialize the
+corresponding payload. Writing these (de)serializers often involves staring at API documentation, hoping it isn't
+out of date or that you don't make a mistake.</p>
+<blockquote>
+<p>A note on automatic derivation: Some languages like <a href="https://www.haskell.org/">Haskell</a> and <a href="https://www.rust-lang.org/">Rust</a> provide a way to automatically
+derive a (de)serializer from a data type. This is often a dangerous practice in a production setting, especially
+if the data type being derived from is used in the business logic itself. Innocent refactorings or changes to
+a data type silently change the serialization scheme with no way of communicating that change to clients.
+Anecdotally myself and several people I know have been bitten by the consequences of this. Even in the rare situation
+where everyone is using the same language and uses a shared library to communicate, there is still a versioning
+and compatibility question to be answered, as we will see in the next section. The only time I reach for
+automatic derivation is during prototyping or if the message flows only through the same component and is not
+persisted anywhere.</p>
+</blockquote>
+<p>In addition, interfaces inevitably evolve over time. Questions around backwards and forwards compatibility are
+inevitable, as are questions around handling breaking API changes. Data serialization is intrinsically tied to this
+as how the data is serialized affects whether or not readers with older or newer schemas can read the data at all.
+Consider a record containing a string and an integer, serialized one after another with the string
+prefixed by its length. Consumers write a parser for this accordingly. The producer later on adds another
+length-prefixed string to the record. How does the producer signal this change? How does the consumer account for
+this change? Is the consumer even aware of this change? Does it need to be?</p>
+<p>This brings us to interface definition languages, or IDLs. IDLs are a domain-specific language for describing data
+types from which serializers and deserializers for various languages can be generated. For example, in
+<a href="https://avro.apache.org/">Avro</a> a Person record with a name and age field would be defined like..</p>
+<pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">{
+  &quot;</span><span style="color:#a3be8c;">type</span><span style="color:#c0c5ce;">&quot;: &quot;</span><span style="color:#a3be8c;">record</span><span style="color:#c0c5ce;">&quot;,
+  &quot;</span><span style="color:#a3be8c;">name</span><span style="color:#c0c5ce;">&quot;: &quot;</span><span style="color:#a3be8c;">Person</span><span style="color:#c0c5ce;">&quot;,
+  &quot;</span><span style="color:#a3be8c;">fields</span><span style="color:#c0c5ce;">&quot;: [
+    { &quot;</span><span style="color:#a3be8c;">name</span><span style="color:#c0c5ce;">&quot;: &quot;</span><span style="color:#a3be8c;">name</span><span style="color:#c0c5ce;">&quot;, &quot;</span><span style="color:#a3be8c;">type</span><span style="color:#c0c5ce;">&quot;: &quot;</span><span style="color:#a3be8c;">string</span><span style="color:#c0c5ce;">&quot; },
+    { &quot;</span><span style="color:#a3be8c;">name</span><span style="color:#c0c5ce;">&quot;: &quot;</span><span style="color:#a3be8c;">age</span><span style="color:#c0c5ce;">&quot;, &quot;</span><span style="color:#a3be8c;">type</span><span style="color:#c0c5ce;">&quot;: &quot;</span><span style="color:#a3be8c;">int</span><span style="color:#c0c5ce;">&quot; }
+  ]
+}
+</span></code></pre>
+<p>..and given that definition, an Avro library would generate (de)serialization code that could be used
+by either the server and the client. This way the source of truth for the interface is centralized in a
+language-agnostic format and serialization logic is handled solely by general purpose, mechanized tooling.</p>
+<p>Besides providing a data serialization format for the specified data type, one of the most important features an IDL
+provides is schema evolution. IDLs provide a set of rules around what forwards or backwards compatible changes can
+be made to a definition and sometimes provide an automated checker for those rules. This allows for cases where say,
+a producer adds a field to a record but the consumer (perhaps using an older version of the
+definition) wants to ignore it and continue parsing as before.</p>
+<p>Over the past several years many IDLs have popped up from Google's <a href="https://developers.google.com/protocol-buffers/">Protocol Buffers</a> to <a href="https://swagger.io/specification/">OpenAPI</a>
+to <a href="https://github.com/mfp/extprot">extprot</a> to <a href="https://capnproto.org/">Cap'n Proto</a>. The design space is huge and different IDLs are crafted in
+different environments optimized for different use cases with different tradeoffs. Instead of attempting to enumerate
+a select few IDLs let's instead take a look at some axes we can use to evaluate them.</p>
+<p><strong>Schema evolution</strong> Arguably the most important feature of an IDL is how schema evolution is handled. Protocol Buffers
+use a <a href="https://developers.google.com/protocol-buffers/docs/proto3#updating%3CPaste%3E">set of rules</a> that are consequences of how it serializes data, like how an optional field can
+be changed to a repeated field. Avro has the notion of a writer's schema and a reader's schema and undergoes a
+process called <a href="https://avro.apache.org/docs/current/spec.html#Schema+Resolution">schema resolution</a> to figure out how to parse a record (with enough handwaving and squinting
+schema resolution resembles record subtyping). Martin Kleppmann has a <a href="https://martin.kleppmann.com/2012/12/05/schema-evolution-in-avro-protocol-buffers-thrift.html">good article</a> comparing
+schema evolution rules of Protocol Buffers, Avro, and Thrift on his blog, plus a more extensive version of it
+in his fantastic book <a href="http://dataintensive.net/">Designing Data-Intensive Applications</a>.</p>
+<p><strong>Compactness</strong> Different IDLs will serialize data differently, with some IDLs providing multiple serialization backends
+(Avro has a binary and JSON encoding). Some IDLs like <a href="https://json-schema.org/">JSON Schema</a> serialize to JSON which while human
+readable, is inherently bulky. Protocol Buffers encodes each field prefixed by its tag and type, one after another.
+Avro's binary serialization contains no field identifying information at all in the encoding, pushing that logic
+completely into the parser itself which requires the writer's schema to be on hand.</p>
+<p><strong>Performance</strong> If you're sending JSON or using RPC to call across a web of microservices or constantly reading and
+writing data in a data-intensive setting, how fast (de)serialization happens matters a lot. Protocol Buffers and Apache
+Thrift were designed for RPC and perform relatively efficiently. Cap'n Proto was designed from the ground-up to be
+extremely efficient to (de)serialize and comes with support for things like memory-mapped files.</p>
+<p><strong>Type system</strong> Because IDLs are essentially languages to describe data-types, the type system of the IDL is also
+important. Most IDLs support the basic few people expect such as integers, booleans, and strings. Once we consider
+sum types or union types though, things begin to fall apart. Protocol Buffers calls sum types &quot;Oneof&quot;, but they
+are not first-class as they <a href="https://developers.google.com/protocol-buffers/docs/proto3#oneof">cannot be repeated</a>. Thrift has unions but because of implementation
+details they are <a href="https://thrift.apache.org/docs/idl#union">always considered optional fields</a>. Avro has <a href="https://avro.apache.org/docs/current/spec.html#Unions">good support for (anonymous) unions</a>
+in theory but in practice the ecosystem has some catching up to do
+(<a href="https://issues.apache.org/jira/browse/AVRO-2140">1</a>, <a href="https://issues.apache.org/jira/browse/AVRO-1343">2</a>,
+<a href="https://github.com/confluentinc/schema-registry/issues/253">3</a>). Extprot, having come from an OCaml setting, seems
+to have very good support for unions, and a type system familiar to functional programmers.</p>
+<p><strong>Incremental parsing, skipping, streaming</strong> Being able to parse streams of data incrementally and easily skip fields
+without parsing them first becomes very important in data-intensive systems. Avro was created in a Hadoop setting and
+was therefore designed to support streaming and skipping. Most binary IDLs by virtue of being binary already have
+some way of delimiting fields which can be used to skip around. Delimiting records themselves can be a bit trickier
+depending on the IDL, but usually doable. Since Avro requires the writer's schema to be on-hand during deserialization,
+records can be skipped by skipping each field at a time. Another way as suggested by the
+<a href="https://developers.google.com/protocol-buffers/docs/techniques">Protocol Buffers documentation</a> is to roll your own (de)serialization scheme and prefix each
+record with its length.</p>
+<p><strong>Ecosystem</strong> While in theory the ecosystem and tooling around one IDL can largely be replicated for any other IDL,
+in practice we don't always want to or have the resources to, especially with deadlines looming. Extprot could be a
+very nice IDL to use, but it has a significantly smaller ecosystem than Protocol Buffers or Avro. Protocol
+Buffers, coming from Google, have lots of momentum behind it thanks to its use in the increasingly
+popular <a href="https://grpc.io/">gRPC</a>. Thrift is used by <a href="https://github.com/facebook/fbthrift">Facebook</a> and <a href="https://github.com/twitter/scrooge">Twitter</a> and is often integrated
+into a lot of their open-source projects, with Twitter's <a href="https://twitter.github.io/finagle/guide/index.html">Finagle</a> being a prime example of this. Avro
+sees much use in the data processing space, and so readily integrates with systems like <a href="https://docs.confluent.io/current/schema-registry/docs/index.html">Kafka</a>,
+<a href="https://databricks.com/blog/2018/11/30/apache-avro-as-a-built-in-data-source-in-apache-spark-2-4.html">Spark</a>, <a href="https://cwiki.apache.org/confluence/display/Hive/AvroSerDe">Hive</a>, and <a href="https://avro.apache.org/docs/current/mr.html">MapReduce</a>.</p>
+<p>We are in an age where data is constantly being serialized and deserialized, be it across the network or to and
+from disk. How data is serialized and how that serialization scheme is communicated between components has become
+a central design decision and should be treated with the appropriate amount of care.</p>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date"> 7 January 2019</div>
+        
+        <div class="article-taxonomies">
+            
+            
+                <ul class="article-tags">
+                    
+                    <li><a href="https://www.adelbertc.com/tags/code/">#code</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/programming-languages/">#programming-languages</a></li>
+                    
+                    <li><a href="https://www.adelbertc.com/tags/systems/">#systems</a></li>
+                    
+                </ul>
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                © Adelblog 2021<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

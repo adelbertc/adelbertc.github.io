@@ -1,0 +1,1607 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+	<title>Adelblog</title>
+	<link href="https://www.adelbertc.com/atom.xml" rel="self" type="application/atom+xml"/>
+  <link href="https://www.adelbertc.com/"/>
+	<generator uri="https://www.getzola.org/">Zola</generator>
+	<updated>2020-01-06T00:00:00+00:00</updated>
+	<id>https://www.adelbertc.com/atom.xml</id>
+	<entry xml:lang="en">
+		<title>Setting up per-project RLS for Emacs with Nix and Direnv</title>
+		<published>2020-01-06T00:00:00+00:00</published>
+		<updated>2020-01-06T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/emacs-rls-nix/" type="text/html"/>
+		<id>https://www.adelbertc.com/emacs-rls-nix/</id>
+		<content type="html">&lt;p&gt;One of my favorite things about &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;&quot;&gt;Nix&lt;&#x2F;a&gt; is using the nix-shell to provision the development tooling for a project
+without infecting the rest of the system. Even if the project itself isn&#x27;t built with Nix, I will often have a
+&lt;code&gt;shell.nix&lt;&#x2F;code&gt; just to provision tools like &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;rust-lang&#x2F;cargo&quot;&gt;Cargo&lt;&#x2F;a&gt; and &lt;a href=&quot;https:&#x2F;&#x2F;www.scala-sbt.org&#x2F;&quot;&gt;SBT&lt;&#x2F;a&gt;. This becomes especially helpful with Rust
+where each of my Rust projects can have a different &lt;code&gt;rustc&lt;&#x2F;code&gt; version without needing to switch my &lt;a href=&quot;https:&#x2F;&#x2F;rustup.rs&#x2F;&quot;&gt;rustup&lt;&#x2F;a&gt; toolchain.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;To that effect, I&#x27;ve setup my Emacs to use the Direnv integration &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;wbolster&#x2F;emacs-direnv&quot;&gt;emacs-direnv&lt;&#x2F;a&gt; to provision the buffer&#x27;s environment using the project&#x27;s
+Nix shell whenever I open a file in that project --- if you&#x27;re not familiar with Direnv I encourage you to
+read about it &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;direnv&#x2F;direnv&#x2F;&quot;&gt;here&lt;&#x2F;a&gt;. That combined with Emacs &lt;a href=&quot;https:&#x2F;&#x2F;langserver.org&#x2F;&quot;&gt;Language Server Protocol&lt;&#x2F;a&gt; (LSP) integration via &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;emacs-lsp&#x2F;lsp-mode&quot;&gt;lsp-mode&lt;&#x2F;a&gt; and
+the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;rust-lang&#x2F;rls&quot;&gt;Rust Language Server&lt;&#x2F;a&gt; (RLS) and I&#x27;ve got a setup that allows me to switch between Rust projects using
+varying Rust versions without hassle.&lt;&#x2F;p&gt;
+&lt;p&gt;This setup took a bit of fiddling to work so I thought I&#x27;d share it here for the public and to document for myself so I don&#x27;t forget.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;setting-up-emacs&quot;&gt;Setting up Emacs&lt;&#x2F;h2&gt;
+&lt;p&gt;The core plugins I use to get this setup working are direnv, lsp-mode, lsp-ui, and company-lsp. &lt;strong&gt;For direnv, besides installing
+the Emacs plugin, make sure to install Direnv itself on your system as well.&lt;&#x2F;strong&gt; For the LSP plugins, I&#x27;ve setup my Emacs to use
+&amp;quot;recent&amp;quot; versions of the plugins since LSP integration is ever-evolving ---  I haven&#x27;t bothered to test what the
+oldest working versions of these plugins are, but at time of writing the versions I&#x27;m using are &lt;code&gt;20191016.1813&lt;&#x2F;code&gt; for lsp-mode,
+&lt;code&gt;20191016.1644&lt;&#x2F;code&gt; for lsp-ui, and &lt;code&gt;20190612.1553&lt;&#x2F;code&gt; for company-lsp. For those managing their Emacs plugins with Nix,
+you can try doing what I do in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;adelbertc&#x2F;dotfiles&#x2F;blob&#x2F;0840e5f3060f61f199f9431765dec307df6b0c6e&#x2F;nixpkgs&#x2F;.config&#x2F;nixpkgs&#x2F;overlays&#x2F;emacs.nix&quot;&gt;my Emacs Nix overlay&lt;&#x2F;a&gt; to get versions newer than upstream Nixpkgs may provide.&lt;&#x2F;p&gt;
+&lt;p&gt;From there my Emacs setup is largely taken from the &lt;a href=&quot;https:&#x2F;&#x2F;scalameta.org&#x2F;metals&#x2F;docs&#x2F;editors&#x2F;emacs.html&quot;&gt;Metals&lt;&#x2F;a&gt; (Scala Language Server) Emacs tutorial, with some
+additions to hook in direnv.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(use-package direnv
+  :init
+  (add-hook &amp;#39;prog-mode-hook #&amp;#39;direnv-update-environment)
+  :config
+  (direnv-mode))
+  
+(use-package company-lsp
+  :defer t)
+
+(use-package lsp-mode
+  :after (direnv evil)
+  :config
+  ; We want LSP
+  (setq lsp-prefer-flymake nil)
+  ; Optional, I don&amp;#39;t like this feature
+  (setq lsp-enable-snippet nil)
+  ; LSP will watch all files in the project
+  ; directory by default, so we eliminate some
+  ; of the irrelevant ones here, most notable
+  ; the .direnv folder which will contain *a lot*
+  ; of Nix-y noise we don&amp;#39;t want indexed.
+  (setq lsp-file-watch-ignored &amp;#39;(
+    &amp;quot;[&#x2F;\\\\]\\.direnv$&amp;quot;
+    ; SCM tools
+    &amp;quot;[&#x2F;\\\\]\\.git$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.hg$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.bzr$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]_darcs$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.svn$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]_FOSSIL_$&amp;quot;
+    ; IDE tools
+    &amp;quot;[&#x2F;\\\\]\\.idea$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.ensime_cache$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.eunit$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]node_modules$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.fslckout$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.tox$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.stack-work$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.bloop$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.metals$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]target$&amp;quot;
+    ; Autotools output
+    &amp;quot;[&#x2F;\\\\]\\.deps$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]build-aux$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]autom4te.cache$&amp;quot;
+    &amp;quot;[&#x2F;\\\\]\\.reference$&amp;quot;)))
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;h2 id=&quot;setting-up-the-project&quot;&gt;Setting up the project&lt;&#x2F;h2&gt;
+&lt;p&gt;Once Emacs is ready to roll we need a &lt;code&gt;shell.nix&lt;&#x2F;code&gt; to provision an environment with Nix and
+an &lt;code&gt;.envrc&lt;&#x2F;code&gt; to tell direnv to use said &lt;code&gt;shell.nix&lt;&#x2F;code&gt; when entering the project.&lt;&#x2F;p&gt;
+&lt;p&gt;While Nixpkgs has &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nixpkgs&#x2F;manual&#x2F;#rust&quot;&gt;some Rust integration&lt;&#x2F;a&gt;, it does not provide many knobs for us
+to turn in terms of the Rust environment we want, like the compiler version or toolchain
+extensions like &lt;code&gt;rust-src&lt;&#x2F;code&gt;. Thankfully, the kind folks at Mozilla published a
+&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;mozilla&#x2F;nixpkgs-mozilla&quot;&gt;Nix overlay&lt;&#x2F;a&gt; that makes it much more ergonomic to work with Rust in Nix.&lt;&#x2F;p&gt;
+&lt;p&gt;Most of the &lt;code&gt;shell.nix&lt;&#x2F;code&gt; then is boilerplate to pull and setup this overlay. From there
+it&#x27;s just a matter of specifying the Rust version we want, along with the extensions we want
+for RLS.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;rust-version &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;1.40.0&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;nixpkgs &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fetchGit &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;url &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;https:&#x2F;&#x2F;github.com&#x2F;NixOS&#x2F;nixpkgs.git&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;rev &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;a3070689aef665ba1f5cc7903a205d3eff082ce9&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;ref &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;release-19.09&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+  };
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;mozilla-overlay &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;=
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;import &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;builtins&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fetchTarball &lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;https:&#x2F;&#x2F;github.com&#x2F;mozilla&#x2F;nixpkgs-mozilla&#x2F;archive&#x2F;master.tar.gz&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;);
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;pkgs &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;import &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;nixpkgs &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;overlays &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mozilla-overlay &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;];
+  };
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;rust-channel &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;rustChannelOf &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;channel &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;rust-version&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;;
+  };
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;rust &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;rust-channel&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;rust&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;override &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;extensions &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;rust-src&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot; ];
+  };
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;cargo &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;rust-channel&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;in
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mkShell &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;rust-dev&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;buildInputs &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;rust cargo &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;];
+  }
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;As for the &lt;code&gt;.envrc&lt;&#x2F;code&gt;, Direnv comes with &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;direnv&#x2F;direnv&#x2F;wiki&#x2F;Nix&quot;&gt;Nix bindings&lt;&#x2F;a&gt; so all we need in
+that file is:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;use_nix
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Now we just need to &lt;code&gt;direnv allow&lt;&#x2F;code&gt; to whitelist the project for Direnv,
+open a file in the project, and reap the rewards --- you should see a little
+&amp;quot;LSP :: Connected to [rls:XXX status:starting]&amp;quot; diagnostic in the
+minibuffer indicating great success. There may be some lag when you open the project
+for the first time as Nix is pulling the dependencies, or before any diagnostics appear as
+RLS is working in the background to download Rust dependencies and compiling the project. To
+make the former a bit more tolerable, I will run &lt;code&gt;nix-shell&lt;&#x2F;code&gt; in a terminal outside of
+Emacs so I can actually see the download progress instead of staring at a locked Emacs session.
+For the latter, lsp-mode and RLS have the &lt;code&gt;lsp-log&lt;&#x2F;code&gt;, &lt;code&gt;rls&lt;&#x2F;code&gt;, and &lt;code&gt;rls::stderr&lt;&#x2F;code&gt; buffers you can
+open to see progress or debug any issues you may encounter.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;other-languages&quot;&gt;Other languages&lt;&#x2F;h2&gt;
+&lt;p&gt;Much of this setup translates readily to other languages or other Emacs language modes. Likely
+all you will need to do is get a &lt;code&gt;shell.nix&lt;&#x2F;code&gt; that provisions the correct environment with any
+tools your language mode needs and you&#x27;re off to the races. Keep in mind though that some languages
+(e.g. Scala) and their corresponding language servers (e.g. SBT + Metals) already have native support
+for project-specific compiler versions so the only win you may get from mimicking this setup in
+those cases is consistency.&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Stop speaking gibberish, start using interfaces</title>
+		<published>2019-01-07T00:00:00+00:00</published>
+		<updated>2019-01-07T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/protocols/" type="text/html"/>
+		<id>https://www.adelbertc.com/protocols/</id>
+		<content type="html">&lt;p&gt;In the age of modular microservices, data pipelines, serverless, and IoT, handling data serialization has become a major
+design decision. While monolithic architectures are well, monolithic, coordination between components is simply a
+function call away. In contrast, components that are separated by a network or run as different stages in a workflow
+must communicate by serializing and deserializing data. Add in questions like how much data is being serialized,
+how often it needs to be serialized, how many languages are in play, and how various components evolve, and we can see
+how data serialization has turned from an incidental problem to a central one.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;One approach to this problem is to use language-native serialization like &lt;a href=&quot;https:&#x2F;&#x2F;docs.oracle.com&#x2F;javase&#x2F;tutorial&#x2F;jndi&#x2F;objects&#x2F;serial.html%3CPaste%3E&quot;&gt;Java serialization&lt;&#x2F;a&gt;
+or &lt;a href=&quot;https:&#x2F;&#x2F;docs.python.org&#x2F;3&#x2F;library&#x2F;pickle.html&quot;&gt;Python pickling&lt;&#x2F;a&gt;. So long as we are using the same language, this has the benefit of being convenient
+and easy to use. It is common to see systems like &lt;a href=&quot;https:&#x2F;&#x2F;spark.apache.org&#x2F;&quot;&gt;Apache Spark&lt;&#x2F;a&gt; rely heavily on native serialization to handle
+communication within the system. However once we need to consider other factors like using multiple languages or
+evolving the serialization scheme, such mechanisms are quickly ruled out.&lt;&#x2F;p&gt;
+&lt;p&gt;Another approach that much of the industry has converged on is to use &lt;a href=&quot;https:&#x2F;&#x2F;json.org&#x2F;&quot;&gt;JSON&lt;&#x2F;a&gt;. JSON is human readable, relatively
+simple, language agnostic, and widespread enough that most languages have a JSON library (some even in the standard
+library). For these reasons a vast amount of public APIs and microservices today have adopted JSON as their main data
+format. However JSON suffers from a big problem (as does language-native serialization): it is unchecked.&lt;&#x2F;p&gt;
+&lt;p&gt;When a client sends a request to or receives a response from a server, it needs to serialize or deserialize the
+corresponding payload. Writing these (de)serializers often involves staring at API documentation, hoping it isn&#x27;t
+out of date or that you don&#x27;t make a mistake.&lt;&#x2F;p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;A note on automatic derivation: Some languages like &lt;a href=&quot;https:&#x2F;&#x2F;www.haskell.org&#x2F;&quot;&gt;Haskell&lt;&#x2F;a&gt; and &lt;a href=&quot;https:&#x2F;&#x2F;www.rust-lang.org&#x2F;&quot;&gt;Rust&lt;&#x2F;a&gt; provide a way to automatically
+derive a (de)serializer from a data type. This is often a dangerous practice in a production setting, especially
+if the data type being derived from is used in the business logic itself. Innocent refactorings or changes to
+a data type silently change the serialization scheme with no way of communicating that change to clients.
+Anecdotally myself and several people I know have been bitten by the consequences of this. Even in the rare situation
+where everyone is using the same language and uses a shared library to communicate, there is still a versioning
+and compatibility question to be answered, as we will see in the next section. The only time I reach for
+automatic derivation is during prototyping or if the message flows only through the same component and is not
+persisted anywhere.&lt;&#x2F;p&gt;
+&lt;&#x2F;blockquote&gt;
+&lt;p&gt;In addition, interfaces inevitably evolve over time. Questions around backwards and forwards compatibility are
+inevitable, as are questions around handling breaking API changes. Data serialization is intrinsically tied to this
+as how the data is serialized affects whether or not readers with older or newer schemas can read the data at all.
+Consider a record containing a string and an integer, serialized one after another with the string
+prefixed by its length. Consumers write a parser for this accordingly. The producer later on adds another
+length-prefixed string to the record. How does the producer signal this change? How does the consumer account for
+this change? Is the consumer even aware of this change? Does it need to be?&lt;&#x2F;p&gt;
+&lt;p&gt;This brings us to interface definition languages, or IDLs. IDLs are a domain-specific language for describing data
+types from which serializers and deserializers for various languages can be generated. For example, in
+&lt;a href=&quot;https:&#x2F;&#x2F;avro.apache.org&#x2F;&quot;&gt;Avro&lt;&#x2F;a&gt; a Person record with a name and age field would be defined like..&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{
+  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;type&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;record&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;,
+  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Person&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;,
+  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fields&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: [
+    { &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;type&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot; },
+    { &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;age&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;type&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;int&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot; }
+  ]
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;..and given that definition, an Avro library would generate (de)serialization code that could be used
+by either the server and the client. This way the source of truth for the interface is centralized in a
+language-agnostic format and serialization logic is handled solely by general purpose, mechanized tooling.&lt;&#x2F;p&gt;
+&lt;p&gt;Besides providing a data serialization format for the specified data type, one of the most important features an IDL
+provides is schema evolution. IDLs provide a set of rules around what forwards or backwards compatible changes can
+be made to a definition and sometimes provide an automated checker for those rules. This allows for cases where say,
+a producer adds a field to a record but the consumer (perhaps using an older version of the
+definition) wants to ignore it and continue parsing as before.&lt;&#x2F;p&gt;
+&lt;p&gt;Over the past several years many IDLs have popped up from Google&#x27;s &lt;a href=&quot;https:&#x2F;&#x2F;developers.google.com&#x2F;protocol-buffers&#x2F;&quot;&gt;Protocol Buffers&lt;&#x2F;a&gt; to &lt;a href=&quot;https:&#x2F;&#x2F;swagger.io&#x2F;specification&#x2F;&quot;&gt;OpenAPI&lt;&#x2F;a&gt;
+to &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;mfp&#x2F;extprot&quot;&gt;extprot&lt;&#x2F;a&gt; to &lt;a href=&quot;https:&#x2F;&#x2F;capnproto.org&#x2F;&quot;&gt;Cap&#x27;n Proto&lt;&#x2F;a&gt;. The design space is huge and different IDLs are crafted in
+different environments optimized for different use cases with different tradeoffs. Instead of attempting to enumerate
+a select few IDLs let&#x27;s instead take a look at some axes we can use to evaluate them.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Schema evolution&lt;&#x2F;strong&gt; Arguably the most important feature of an IDL is how schema evolution is handled. Protocol Buffers
+use a &lt;a href=&quot;https:&#x2F;&#x2F;developers.google.com&#x2F;protocol-buffers&#x2F;docs&#x2F;proto3#updating%3CPaste%3E&quot;&gt;set of rules&lt;&#x2F;a&gt; that are consequences of how it serializes data, like how an optional field can
+be changed to a repeated field. Avro has the notion of a writer&#x27;s schema and a reader&#x27;s schema and undergoes a
+process called &lt;a href=&quot;https:&#x2F;&#x2F;avro.apache.org&#x2F;docs&#x2F;current&#x2F;spec.html#Schema+Resolution&quot;&gt;schema resolution&lt;&#x2F;a&gt; to figure out how to parse a record (with enough handwaving and squinting
+schema resolution resembles record subtyping). Martin Kleppmann has a &lt;a href=&quot;https:&#x2F;&#x2F;martin.kleppmann.com&#x2F;2012&#x2F;12&#x2F;05&#x2F;schema-evolution-in-avro-protocol-buffers-thrift.html&quot;&gt;good article&lt;&#x2F;a&gt; comparing
+schema evolution rules of Protocol Buffers, Avro, and Thrift on his blog, plus a more extensive version of it
+in his fantastic book &lt;a href=&quot;http:&#x2F;&#x2F;dataintensive.net&#x2F;&quot;&gt;Designing Data-Intensive Applications&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Compactness&lt;&#x2F;strong&gt; Different IDLs will serialize data differently, with some IDLs providing multiple serialization backends
+(Avro has a binary and JSON encoding). Some IDLs like &lt;a href=&quot;https:&#x2F;&#x2F;json-schema.org&#x2F;&quot;&gt;JSON Schema&lt;&#x2F;a&gt; serialize to JSON which while human
+readable, is inherently bulky. Protocol Buffers encodes each field prefixed by its tag and type, one after another.
+Avro&#x27;s binary serialization contains no field identifying information at all in the encoding, pushing that logic
+completely into the parser itself which requires the writer&#x27;s schema to be on hand.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Performance&lt;&#x2F;strong&gt; If you&#x27;re sending JSON or using RPC to call across a web of microservices or constantly reading and
+writing data in a data-intensive setting, how fast (de)serialization happens matters a lot. Protocol Buffers and Apache
+Thrift were designed for RPC and perform relatively efficiently. Cap&#x27;n Proto was designed from the ground-up to be
+extremely efficient to (de)serialize and comes with support for things like memory-mapped files.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Type system&lt;&#x2F;strong&gt; Because IDLs are essentially languages to describe data-types, the type system of the IDL is also
+important. Most IDLs support the basic few people expect such as integers, booleans, and strings. Once we consider
+sum types or union types though, things begin to fall apart. Protocol Buffers calls sum types &amp;quot;Oneof&amp;quot;, but they
+are not first-class as they &lt;a href=&quot;https:&#x2F;&#x2F;developers.google.com&#x2F;protocol-buffers&#x2F;docs&#x2F;proto3#oneof&quot;&gt;cannot be repeated&lt;&#x2F;a&gt;. Thrift has unions but because of implementation
+details they are &lt;a href=&quot;https:&#x2F;&#x2F;thrift.apache.org&#x2F;docs&#x2F;idl#union&quot;&gt;always considered optional fields&lt;&#x2F;a&gt;. Avro has &lt;a href=&quot;https:&#x2F;&#x2F;avro.apache.org&#x2F;docs&#x2F;current&#x2F;spec.html#Unions&quot;&gt;good support for (anonymous) unions&lt;&#x2F;a&gt;
+in theory but in practice the ecosystem has some catching up to do
+(&lt;a href=&quot;https:&#x2F;&#x2F;issues.apache.org&#x2F;jira&#x2F;browse&#x2F;AVRO-2140&quot;&gt;1&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;issues.apache.org&#x2F;jira&#x2F;browse&#x2F;AVRO-1343&quot;&gt;2&lt;&#x2F;a&gt;,
+&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;confluentinc&#x2F;schema-registry&#x2F;issues&#x2F;253&quot;&gt;3&lt;&#x2F;a&gt;). Extprot, having come from an OCaml setting, seems
+to have very good support for unions, and a type system familiar to functional programmers.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Incremental parsing, skipping, streaming&lt;&#x2F;strong&gt; Being able to parse streams of data incrementally and easily skip fields
+without parsing them first becomes very important in data-intensive systems. Avro was created in a Hadoop setting and
+was therefore designed to support streaming and skipping. Most binary IDLs by virtue of being binary already have
+some way of delimiting fields which can be used to skip around. Delimiting records themselves can be a bit trickier
+depending on the IDL, but usually doable. Since Avro requires the writer&#x27;s schema to be on-hand during deserialization,
+records can be skipped by skipping each field at a time. Another way as suggested by the
+&lt;a href=&quot;https:&#x2F;&#x2F;developers.google.com&#x2F;protocol-buffers&#x2F;docs&#x2F;techniques&quot;&gt;Protocol Buffers documentation&lt;&#x2F;a&gt; is to roll your own (de)serialization scheme and prefix each
+record with its length.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Ecosystem&lt;&#x2F;strong&gt; While in theory the ecosystem and tooling around one IDL can largely be replicated for any other IDL,
+in practice we don&#x27;t always want to or have the resources to, especially with deadlines looming. Extprot could be a
+very nice IDL to use, but it has a significantly smaller ecosystem than Protocol Buffers or Avro. Protocol
+Buffers, coming from Google, have lots of momentum behind it thanks to its use in the increasingly
+popular &lt;a href=&quot;https:&#x2F;&#x2F;grpc.io&#x2F;&quot;&gt;gRPC&lt;&#x2F;a&gt;. Thrift is used by &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;facebook&#x2F;fbthrift&quot;&gt;Facebook&lt;&#x2F;a&gt; and &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;twitter&#x2F;scrooge&quot;&gt;Twitter&lt;&#x2F;a&gt; and is often integrated
+into a lot of their open-source projects, with Twitter&#x27;s &lt;a href=&quot;https:&#x2F;&#x2F;twitter.github.io&#x2F;finagle&#x2F;guide&#x2F;index.html&quot;&gt;Finagle&lt;&#x2F;a&gt; being a prime example of this. Avro
+sees much use in the data processing space, and so readily integrates with systems like &lt;a href=&quot;https:&#x2F;&#x2F;docs.confluent.io&#x2F;current&#x2F;schema-registry&#x2F;docs&#x2F;index.html&quot;&gt;Kafka&lt;&#x2F;a&gt;,
+&lt;a href=&quot;https:&#x2F;&#x2F;databricks.com&#x2F;blog&#x2F;2018&#x2F;11&#x2F;30&#x2F;apache-avro-as-a-built-in-data-source-in-apache-spark-2-4.html&quot;&gt;Spark&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;cwiki.apache.org&#x2F;confluence&#x2F;display&#x2F;Hive&#x2F;AvroSerDe&quot;&gt;Hive&lt;&#x2F;a&gt;, and &lt;a href=&quot;https:&#x2F;&#x2F;avro.apache.org&#x2F;docs&#x2F;current&#x2F;mr.html&quot;&gt;MapReduce&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;We are in an age where data is constantly being serialized and deserialized, be it across the network or to and
+from disk. How data is serialized and how that serialization scheme is communicated between components has become
+a central design decision and should be treated with the appropriate amount of care.&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Existential types in Rust</title>
+		<published>2018-12-10T00:00:00+00:00</published>
+		<updated>2018-12-10T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/rust-existentials/" type="text/html"/>
+		<id>https://www.adelbertc.com/rust-existentials/</id>
+		<content type="html">&lt;p&gt;For the past couple of weeks I have been using &lt;a href=&quot;https:&#x2F;&#x2F;www.rust-lang.org&#x2F;en-US&#x2F;&quot;&gt;Rust&lt;&#x2F;a&gt; for a project at
+work and enjoying it a lot. The emphasis on systems programming
+aligns well with my interest in systems, the unique type system keeps
+the programming languages enthusiast in me interested, and the use of
+expressive types, as always, keeps me in check and makes me confident in my
+code.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;However, it wasn&#x27;t long before I hit a bit of an obstacle.
+The Rust project I am working on is a caching layer, currently backed by
+&lt;a href=&quot;https:&#x2F;&#x2F;redis.io&#x2F;&quot;&gt;Redis&lt;&#x2F;a&gt;, and it came to a point where I needed to leverage
+&lt;a href=&quot;https:&#x2F;&#x2F;redis.io&#x2F;topics&#x2F;pipelining&quot;&gt;pipelining&lt;&#x2F;a&gt;.
+On its own, pipelining is straightforward as the &lt;a href=&quot;https:&#x2F;&#x2F;crates.io&#x2F;crates&#x2F;redis&quot;&gt;redis&lt;&#x2F;a&gt;
+crate implements it already. However all notions of a cache in our code are
+abstracted out behind a trait so we can have alternative implementations,
+such as an in-memory &lt;code&gt;HashMap&lt;&#x2F;code&gt;-backed implementation.&lt;&#x2F;p&gt;
+&lt;p&gt;The problem arises with representing the pipeline in code. The redis crate
+encodes the pipeline with the &lt;code&gt;redis::Pipeline&lt;&#x2F;code&gt; struct:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Taken from https:&#x2F;&#x2F;docs.rs&#x2F;redis&#x2F;0.9.1&#x2F;redis&#x2F;struct.Pipeline.html
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;((k1, k2),) : ((&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;),) = redis::pipe()
+    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;cmd&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;SET&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;arg&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;key_1&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;arg&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;42&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;ignore&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;cmd&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;SET&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;arg&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;key_2&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;arg&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;43&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;ignore&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;cmd&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;MGET&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;arg&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;[&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;key_1&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;key_2&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;]).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;query&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;con)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;I could augment our trait to use this &lt;code&gt;Pipeline&lt;&#x2F;code&gt; struct..&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;trait &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Cache {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; redis::Pipeline;
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;..but that would force any implementation of our cache to Redis&#x27;s notion of
+a pipeline. Not only would this make it difficult to introspect during testing,
+but it would also be nonsensical for our &lt;code&gt;HashMap&lt;&#x2F;code&gt;-backed cache. What I needed
+was a way to return an abstract type that could change from implementation to
+implementation, yet still allow a set of operations on it so clients would be
+able to work with the abstract type despite not knowing what it was concretely.&lt;&#x2F;p&gt;
+&lt;p&gt;My usual answer to this in languages that support higher-kinded types is to use
+&lt;a href=&quot;http:&#x2F;&#x2F;okmij.org&#x2F;ftp&#x2F;tagless-final&#x2F;index.html&quot;&gt;tagless-final&lt;&#x2F;a&gt; algebras, but Rust&#x27;s type system
+&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;rust-lang&#x2F;rfcs&#x2F;issues&#x2F;324&quot;&gt;currently doesn&#x27;t support higher-kinded types&lt;&#x2F;a&gt;&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#1&quot;&gt;1&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;. Fortunately,
+there is a pretty good alternative that Rust does support: existential types.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;an-overview-of-existential-types&quot;&gt;An overview of existential types&lt;&#x2F;h3&gt;
+&lt;p&gt;Many languages support &lt;em&gt;universally&lt;&#x2F;em&gt; quantified types, more commonly known as
+generics or parameterized types. Significantly fewer support
+&lt;em&gt;existentially&lt;&#x2F;em&gt; quantified types - the more mainstream languages that do
+support it consist of Scala, Haskell, OCaml, and as we will see in this
+post, Rust.&lt;&#x2F;p&gt;
+&lt;p&gt;A universally quantified type communicates the idea of &amp;quot;for all types,&amp;quot; hence
+the use of the phrase &amp;quot;universal.&amp;quot; In code this translates to the &lt;em&gt;caller&lt;&#x2F;em&gt;
+being able to pick the instantiated type.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;take&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;lt;A&amp;gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;vec&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: Vec&amp;lt;A&amp;gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;n&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;usize&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) -&amp;gt; Vec&amp;lt;A&amp;gt; {
+  ...
+}
+
+take::&amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt;(vec![&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;);
+take::&amp;lt;&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt;(vec![&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;hello&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot; &amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;world&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;);
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The above snippet defines a function &lt;code&gt;take&lt;&#x2F;code&gt; with universally quantified
+type &lt;code&gt;A&lt;&#x2F;code&gt;. The callers below then pick whatever instantiation of &lt;code&gt;A&lt;&#x2F;code&gt; they want,
+in this case &lt;code&gt;i32&lt;&#x2F;code&gt; and &lt;code&gt;&amp;amp;str&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;In contrast, existentially quantified types communicates &amp;quot;there exists a type.&amp;quot;
+In code this translates to the &lt;em&gt;callee&lt;&#x2F;em&gt;, or function, picking the instantiated
+type.&lt;&#x2F;p&gt;
+&lt;p&gt;One way Rust encodes this is through the &lt;code&gt;impl Trait&lt;&#x2F;code&gt; feature introduced in
+Rust 1.26 (or similarly with &lt;code&gt;Box&amp;lt;Trait&amp;gt;&lt;&#x2F;code&gt;). The idea is functions can specify
+just the trait a return type implements instead of a concrete type - this
+constrains the caller to only be able to use methods available on that trait
+and liberates the callee to be able to swap the internals without the
+caller being the wiser&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#2&quot;&gt;2&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub trait &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;render&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) -&amp;gt; String
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;String {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;render&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) -&amp;gt; String {
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+  }
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; impl Token {
+  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;this is not a token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; token = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Here we define a function &lt;code&gt;get_token&lt;&#x2F;code&gt; whose static type states it returns some
+type (&lt;em&gt;there exists&lt;&#x2F;em&gt; some type..) that implements the &lt;code&gt;Token&lt;&#x2F;code&gt; trait. Even
+though the function &lt;em&gt;interally&lt;&#x2F;em&gt; is using &lt;code&gt;String&lt;&#x2F;code&gt;, that information is
+hidden&#x2F;lost with the &lt;code&gt;impl Token&lt;&#x2F;code&gt; return type. All we can do with &lt;code&gt;token&lt;&#x2F;code&gt; is
+call the &lt;code&gt;render&lt;&#x2F;code&gt; method on it and nothing else, not even methods on &lt;code&gt;String&lt;&#x2F;code&gt;.
+If at a later point the implementation of &lt;code&gt;get_token&lt;&#x2F;code&gt; changes to some other
+type that implements &lt;code&gt;Token&lt;&#x2F;code&gt;, that can happen transparently to all existing
+call-sites.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;sharing-is-caring&quot;&gt;Sharing is caring&lt;&#x2F;h3&gt;
+&lt;p&gt;One downside of the &lt;code&gt;impl Trait&lt;&#x2F;code&gt; approach is there is no way to have a group
+of functions share the same view of an existential type. For example if we
+wanted to write a &lt;code&gt;renew_token&lt;&#x2F;code&gt; function that took the same token type as
+&lt;code&gt;get_token&lt;&#x2F;code&gt;
+and returned a new token, there is no way for us to communicate to Rust that
+the &lt;code&gt;impl Token&lt;&#x2F;code&gt; returned by &lt;code&gt;get_token&lt;&#x2F;code&gt; should be the same &lt;code&gt;impl Token&lt;&#x2F;code&gt;
+consumed and produced by &lt;code&gt;renew_token&lt;&#x2F;code&gt;. Indeed, Rust rejects the following
+addition..&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; ...
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; impl Token {
+  ...
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; ...
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;renew_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: impl Token) -&amp;gt; impl Token {
+  unimplemented!()
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; expired_token = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;();
+expired_token = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;renew_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(expired_token);
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;..with error &amp;quot;expected anonymized type, found a different anonymized type.&amp;quot;
+This is because given the types in their current form, there is no guarantee
+the two &lt;code&gt;impl Token&lt;&#x2F;code&gt;s are the same - &lt;code&gt;get_token&lt;&#x2F;code&gt; could return a &lt;code&gt;String&lt;&#x2F;code&gt;
+and &lt;code&gt;renew_token&lt;&#x2F;code&gt; could return a JSON Web Token and so the type checker must
+pessimistically reject the re-assignment.&lt;&#x2F;p&gt;
+&lt;p&gt;Thankfully Rust provides another approach to existential types through its
+associated types feature. Instead of hiding the concrete type behind
+&lt;code&gt;impl Trait&lt;&#x2F;code&gt;, we can use associated types and parameterize functions with
+type parameters that implement the corresponding trait. For example:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub trait &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;type &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token;
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;renew_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;t&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token;
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get_and_renew&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;lt;T: Token&amp;gt;() -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;T::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; token = T::get_token();
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;renew_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(token)
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This time we define a trait &lt;code&gt;Token&lt;&#x2F;code&gt; with an abstract associated type and
+define methods that point to that associated type. Because now we have
+a single type definition to point to, we can tell the compiler that for
+a given implementation of &lt;code&gt;Token&lt;&#x2F;code&gt;, &lt;code&gt;get_token&lt;&#x2F;code&gt; and &lt;code&gt;renew_token&lt;&#x2F;code&gt; must
+refer to the same &lt;code&gt;Token&lt;&#x2F;code&gt; type.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;String {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;type &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Token = String;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; String {
+    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;this is not a token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+  }
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;renew_token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;t&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: String) -&amp;gt; String {
+    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;this is not a renewed token&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+  }
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;We then define a function &lt;code&gt;get_and_renew&lt;&#x2F;code&gt; that is parameterized by (or if
+you&#x27;d like, universally quantified over) a type &lt;code&gt;T&lt;&#x2F;code&gt; that implements &lt;code&gt;Token&lt;&#x2F;code&gt;.
+However, since inside the definition of &lt;code&gt;get_and_renew&lt;&#x2F;code&gt; we do not know what
+&lt;code&gt;T&lt;&#x2F;code&gt; will be, the associated type &lt;code&gt;T::Token&lt;&#x2F;code&gt; is abstract to us and thus
+existentially quantified. We only know that calling &lt;code&gt;T::get_token&lt;&#x2F;code&gt; will give
+us some type &lt;code&gt;T::Token&lt;&#x2F;code&gt; (the existential type), but now we also know we can
+pass that &lt;code&gt;T::Token&lt;&#x2F;code&gt; to &lt;code&gt;T::renew_token&lt;&#x2F;code&gt; and get back a token of the same type!&lt;&#x2F;p&gt;
+&lt;p&gt;This approach mimics the &amp;quot;&lt;a href=&quot;https:&#x2F;&#x2F;v1.realworldocaml.org&#x2F;v1&#x2F;en&#x2F;html&#x2F;files-modules-and-programs.html&quot;&gt;ML-style modules&lt;&#x2F;a&gt;&amp;quot; technique that is
+the primary organization and abstraction mechanism in the ML-family of
+languages (e.g. &lt;a href=&quot;http:&#x2F;&#x2F;sml-family.org&#x2F;&quot;&gt;Standard ML&lt;&#x2F;a&gt; and &lt;a href=&quot;https:&#x2F;&#x2F;ocaml.org&#x2F;&quot;&gt;OCaml&lt;&#x2F;a&gt;). Indeed, just like
+the ML-family of languages, we can organize entire Rust programs like this
+and at the top-level seamlessly swap out different implementations of different
+components by instantiating different types (e.g. &lt;code&gt;String&lt;&#x2F;code&gt; or JWT in the above
+example).&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;an-end-to-end-example-caching-with-redis-and-a-hash-table&quot;&gt;An end-to-end example: caching with Redis and a hash table&lt;&#x2F;h3&gt;
+&lt;p&gt;Going back to the initial motivation for this adventure, we can now see how we
+can abstract over a caching layer with existential types.&lt;&#x2F;p&gt;
+&lt;p&gt;First we define the operations we want our cache to have in a trait - for
+simplicity we assume a cache with string keys and integer values:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub trait &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Cache {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;type &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipe: Pipeline;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipe;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;query&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipe) -&amp;gt; Option&amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt;;
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub trait &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipeline {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;key&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;);
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;set&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;key&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;value&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;);
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;We define a &lt;code&gt;Cache&lt;&#x2F;code&gt; trait with an associated type &lt;code&gt;Pipe&lt;&#x2F;code&gt; which represents
+our pipelined operations. &lt;code&gt;Pipe&lt;&#x2F;code&gt; is constrained to implement the &lt;code&gt;Pipeline&lt;&#x2F;code&gt;
+trait which captures the operations the pipeline supports - this could have
+been on the &lt;code&gt;Cache&lt;&#x2F;code&gt; trait itself but separating it out and making the
+operations methods makes it more ergonomic.&lt;&#x2F;p&gt;
+&lt;p&gt;Our cache provides two operations: &lt;code&gt;pipe&lt;&#x2F;code&gt; which creates a new
+pipeline, and &lt;code&gt;query&lt;&#x2F;code&gt; which executes the pipeline and returns either
+&lt;code&gt;Some&lt;&#x2F;code&gt; if the last operation was a &lt;code&gt;get&lt;&#x2F;code&gt; and &lt;code&gt;None&lt;&#x2F;code&gt; if it was a &lt;code&gt;set&lt;&#x2F;code&gt;&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#3&quot;&gt;3&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;We can program against this interface by parameterizing with a
+type that implements the &lt;code&gt;Cache&lt;&#x2F;code&gt; trait, like so:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;program&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;lt;C: Cache&amp;gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cache&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; C) -&amp;gt; Option&amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt; {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; pipe = C::pipe();
+  pipe.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;set&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;hitchiker&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;42&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;);
+  pipe.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;adel&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;);
+  cache.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;query&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(pipe)
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Before we can actually execute this program we need to implement &lt;code&gt;Cache&lt;&#x2F;code&gt; first.
+First the Redis implementation:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;redis::{Connection, Pipeline as RedisPipeline, PipelineCommands};
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipeline &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;RedisPipeline {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;key&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) {
+    PipelineCommands::get(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, key.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;());
+  }
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;set&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;key&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;value&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) {
+    PipelineCommands::set(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, key.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(), value);
+  }
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub struct &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;RedisInfo {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;connection&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: Connection,
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Cache &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;RedisInfo {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;type &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipe = RedisPipeline;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; RedisPipeline {
+    redis::pipe()
+  }
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;query&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: RedisPipeline) -&amp;gt; Option&amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt; {
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Generally we should do something smarter here
+    &#x2F;&#x2F; but glossing over that to simplify the post
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;    pipe.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;query&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.connection).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;ok&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()
+  }
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Alternatively, we could implement it with a &lt;code&gt;HashMap&lt;&#x2F;code&gt; which would not
+actually have pipelining since everything is in-memory, but could be
+useful for testing and inspecting the pipelined payload.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub enum &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Ops {
+  Get { key: String },
+  Set { key: String, value: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;},
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipeline &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Vec&amp;lt;Ops&amp;gt; {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;key&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) {
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;push&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(Ops::Get { key: key.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() })
+  }
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;set&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;key&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;str&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;value&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) {
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;push&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(Ops::Set { key: key.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(), value })
+  }
+}
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Cache &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;HashMap&amp;lt;String, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt; {
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;type &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Pipe = Vec&amp;lt;Ops&amp;gt;;
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() -&amp;gt; Vec&amp;lt;Ops&amp;gt; {
+    Vec::new()
+  }
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;query&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pipe&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;: Vec&amp;lt;Ops&amp;gt;) -&amp;gt; Option&amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt; {
+    pipe.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;iter&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;().&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;fold&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(None, |_, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;op&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;| {
+      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;match&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; op {
+        Ops::Get { key } =&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(key).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;map&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(|&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;i&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;| i.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;()),
+        Ops::Set { key, value } =&amp;gt; {
+          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(key.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(), value.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;());
+          None
+        }
+      }
+    })
+  }
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Finally, we can actually run our program with either implementation
+serving as the backend.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;redis::{Client, Connection};
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Redis backend
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; client = Client::open(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;redis:&#x2F;&#x2F;127.0.0.1&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;();
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; redis = RedisInfo { connection: client.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get_connection&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;().&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;() };
+program::&amp;lt;RedisInfo&amp;gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; redis);
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; HashMap backend
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; cache = HashMap::new();
+program::&amp;lt;HashMap&amp;lt;String, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt;&amp;gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; cache);
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;And there we have it: a program that is parameterized by an abstract,
+pipeline-supported &lt;code&gt;Cache&lt;&#x2F;code&gt;, two implementations of that cache, both of
+which can be seamlessly plugged in. Existential types are pretty cool
+(and underrated).&lt;&#x2F;p&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;1&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;1&lt;&#x2F;sup&gt;
+&lt;p&gt;Getting close though! See: &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;rust-lang&#x2F;rfcs&#x2F;pull&#x2F;1598&quot;&gt;https:&#x2F;&#x2F;github.com&#x2F;rust-lang&#x2F;rfcs&#x2F;pull&#x2F;1598&lt;&#x2F;a&gt;.
+&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#2&quot;&gt;2&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;: Obligatory &lt;a href=&quot;https:&#x2F;&#x2F;youtu.be&#x2F;GqmsQeSzMdw&quot;&gt;Constraints Liberate, Liberties Constrain&lt;&#x2F;a&gt;.
+&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#3&quot;&gt;3&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;: This is not the best type signature for the method as the &lt;code&gt;Option&lt;&#x2F;code&gt; return
+type is dynamic whereas statically we should know if it is a &lt;code&gt;Some&lt;&#x2F;code&gt;
+(last operation was a &lt;code&gt;get&lt;&#x2F;code&gt;) or &lt;code&gt;None&lt;&#x2F;code&gt; (last operation was a &lt;code&gt;set&lt;&#x2F;code&gt;). This
+choice was made purely to simplify the presentation of this blog post.
+I&#x27;m sorry.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Ruminations on the end-to-end argument</title>
+		<published>2018-08-13T00:00:00+00:00</published>
+		<updated>2018-08-13T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/end-to-end/" type="text/html"/>
+		<id>https://www.adelbertc.com/end-to-end/</id>
+		<content type="html">&lt;p&gt;I spend a lot of my time reading papers and over the years a couple have
+always stuck out to me. For this post I
+wanted to write about an oldie but goodie: Saltzer, Reed, and Clark&#x27;s
+&amp;quot;&lt;a href=&quot;http:&#x2F;&#x2F;people.eecs.berkeley.edu&#x2F;%7Eprabal&#x2F;resources&#x2F;osprelim&#x2F;SRC84.pdf&quot;&gt;End-To-End Arguments in System Design&lt;&#x2F;a&gt;.&amp;quot;&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;The end-to-end argument posits that functions between cooperating
+components can only be properly implemented by the components themselves,
+as opposed to any sort of middleware between the components. The
+canonical example is reliable delivery between network-separated applications:
+while network protocols can ensure packets flow through the
+network intact, only the application can verify complete, end-to-end correctness.
+If there is an error buffering to or from the socket, if there is memory
+corruption, if the application itself is buggy, the fact that the packet
+made its way through the network is not useful as the data must still be
+re-sent.&lt;&#x2F;p&gt;
+&lt;p&gt;This is not to say that reliable delivery implemented at the network layer
+is useless (see: TCP), and it doesn&#x27;t mean all functions between components
+must be implemented end-to-end. The crux of the end-to-end argument is that
+a function can only be implemented with complete correctness end-to-end, and
+any implementation by middleware is incomplete and can exist at most as a
+&lt;em&gt;potential&lt;&#x2F;em&gt; enhancement.&lt;&#x2F;p&gt;
+&lt;p&gt;As another example, in a voicemail setting receiving voice data intact is important.
+Without a protocol like TCP the application would need to handle
+ordered error-free delivery in addition to making sure the voice data is
+OK - here TCP is a welcome enhancement.&lt;&#x2F;p&gt;
+&lt;p&gt;Conversely, in a VoIP setting latency is key.
+A protocol like TCP would be inappropriate as any delays caused by
+retries would be unacceptable. Instead, VoIP
+is often sent over an unreliable protocol like UDP with end-to-end
+checking being handled by the participants themselves: &amp;quot;Can you say that again?&amp;quot;&lt;&#x2F;p&gt;
+&lt;p&gt;That is the gist of the paper, but I encourage anyone who hasn&#x27;t read the
+paper, at all or in a while, to read it. I also recommend watching
+Professor Justine Sherry&#x27;s &lt;a href=&quot;https:&#x2F;&#x2F;youtu.be&#x2F;aR_UOSGEizE&quot;&gt;talk on the paper&lt;&#x2F;a&gt; at PWLConf 2016.&lt;&#x2F;p&gt;
+&lt;p&gt;While the paper is often cited as a systems paper, I have seen several examples
+of the argument in programming languages and software engineering. The rest
+of this post discusses some of these examples.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;reifying-effects&quot;&gt;Reifying effects&lt;&#x2F;h3&gt;
+&lt;p&gt;In functional programming it is common to talk about reifying effects, where
+&amp;quot;effect&amp;quot; refers to a context in which a value is computed. For instance,
+the evaluation of a value which may or may not exist can be considered an effect.
+In languages like Java or Go such an effect is built into the language with the
+special &lt;code&gt;null&lt;&#x2F;code&gt; value. Constrast this with languages like Haskell and OCaml where
+such an effect is explicitly reified into a distinct type constructor,
+&lt;code&gt;Maybe a&lt;&#x2F;code&gt; versus &lt;code&gt;a&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;We can view this through the lens of the end-to-end argument by looking at
+the expressions producing or consuming such values as the components and the language
+itself as the middleware. In the &lt;code&gt;null&lt;&#x2F;code&gt; case the language has
+provided functionality &amp;quot;for free,&amp;quot; allowing any reference value to be assigned
+&lt;code&gt;null&lt;&#x2F;code&gt; if there is no meaningful value to assign.
+However as evidenced by the now famous &amp;quot;&lt;a href=&quot;https:&#x2F;&#x2F;www.infoq.com&#x2F;presentations&#x2F;Null-References-The-Billion-Dollar-Mistake-Tony-Hoare&quot;&gt;Billion Dollar Mistake&lt;&#x2F;a&gt;&amp;quot; talk,
+this provided functionality does more harm than good.
+Many languages have since opted for a more explicit, end-to-end method of signaling
+absence of a value.&lt;&#x2F;p&gt;
+&lt;p&gt;One interesting language to look at is Scala - while
+the language itself does have &lt;code&gt;null&lt;&#x2F;code&gt;, much of the community pretends it doesn&#x27;t
+and instead wraps relevant values in the &lt;code&gt;Option&lt;&#x2F;code&gt; constructor. Unfortunately, just
+like if reliable delivery was used in VoIP, the cost of the unnecessary
+middleware functionality must still be paid as a value of type &lt;code&gt;Option&lt;&#x2F;code&gt; may
+still be &lt;code&gt;null&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;The same argument can be made for other effects, including exceptions
+(&lt;code&gt;Either&lt;&#x2F;code&gt;), dependency injection (&lt;code&gt;Reader&lt;&#x2F;code&gt;), and side effects (&lt;code&gt;IO&lt;&#x2F;code&gt;).&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;source-vs-binary-dependencies&quot;&gt;Source vs. binary dependencies&lt;&#x2F;h3&gt;
+&lt;p&gt;Package managers have to make a choice between
+source versus binary dependencies. On one hand source dependencies retain all the
+structure setup by its developers and allow the user to
+turn on whatever flags, features, and optimizations they want. On the other hand binary
+dependencies are compiled and much easier to use and install,
+at the cost of hoping the packaged configuration is configured to par.&lt;&#x2F;p&gt;
+&lt;p&gt;Unfortunately binary dependencies can be inconvenient to depend on, especially in
+an ecosystem like the JVM where classpaths can conflict and need to be
+binary compatible. &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;typelevel&#x2F;cats&#x2F;blob&#x2F;6f049ad68387deefbf5a527f4fbb1d5910d8fc6e&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;cats&#x2F;data&#x2F;Kleisli.scala#L185-L192&quot;&gt;Innocent changes to source&lt;&#x2F;a&gt; that
+would work fine in a source dependency model can cause runtime errors in
+a binary dependency model.&lt;&#x2F;p&gt;
+&lt;p&gt;Here we can treat packages as components and the toolchain as the middleware. If the
+toolchain is centered around binary dependencies, any customizations of
+a dependency a package becomes difficult and often results in
+not only forking the dependency, but also re-packaging and publishing
+the dependency. Contrast with a toolchain built for source dependencies, the
+only steps needed would be to fork and re-point the location of the source
+to depend on.&lt;&#x2F;p&gt;
+&lt;p&gt;Again this is not to say the end-to-end argument
+suggests source dependencies are strictly better than binary dependencies.
+Rather it suggests that binary dependencies, while often times convenient,
+are an incomplete mechanism for dependency management; a source dependency
+model is more complete.&lt;&#x2F;p&gt;
+&lt;p&gt;To this last point, while the &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;&quot;&gt;Nix&lt;&#x2F;a&gt; package manager is designed around
+source dependencies, it also supports binary dependencies explicitly
+as an optimization - see &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;%7Eeelco&#x2F;pubs&#x2F;phd-thesis.pdf&quot;&gt;Dr. Eelco Dolstra&#x27;s Ph.D. thesis&lt;&#x2F;a&gt;,
+section 7.3 for more information.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;frameworks-vs-libraries&quot;&gt;Frameworks vs. libraries&lt;&#x2F;h3&gt;
+&lt;p&gt;For the past couple of years I struggled with figuring out what it was about
+&amp;quot;libraries&amp;quot; that I liked and &amp;quot;frameworks&amp;quot; that I didn&#x27;t, but as it turns out
+the end-to-end argument is applicable here too.&lt;&#x2F;p&gt;
+&lt;p&gt;With enough handwaving, we can define &lt;em&gt;frameworks&lt;&#x2F;em&gt; as components that want
+code a certain way, and if you can mold your
+problem to fit the model then you can &amp;quot;just plug-in&amp;quot; to a larger
+ecosystem and get functionality &amp;quot;for free.&amp;quot; The &lt;a href=&quot;https:&#x2F;&#x2F;akka.io&#x2F;&quot;&gt;Akka&lt;&#x2F;a&gt; project is one example
+of this.&lt;&#x2F;p&gt;
+&lt;p&gt;In contrast, &lt;em&gt;libraries&lt;&#x2F;em&gt; are components that provide pieces of functionality
+which you pull piecemeal without having to go all-in on an
+ecosystem. To contrast, &lt;a href=&quot;https:&#x2F;&#x2F;functional-streams-for-scala.github.io&#x2F;fs2&#x2F;&quot;&gt;FS2&lt;&#x2F;a&gt; is an example of this.&lt;&#x2F;p&gt;
+&lt;p&gt;Still my definitions are vague, and I will likely write a
+dedicated blog post about this in the future. For now I can only present
+a heuristic I use to gauge if something is a framework or a library.
+Given a function that has no knowledge of the components in question, how
+easy is it to use that function in the context of the component?
+In Akka this often involves creating an actor that
+then interacts with the other actors. In FS2, the combinator-centric model
+allows us to immediately use the function in a stream.&lt;&#x2F;p&gt;
+&lt;p&gt;Applying the end-to-end argument, frameworks often try to encapsulate
+a lot of functionality in the middleware, at the cost of requiring users to
+mold their problem to the framework. In a library model functionality
+is provided piecemeal and it is on the user to compose them to their
+liking. The justification of frameworks then hinges on whether or not the
+partial functionality provided is worth the cost of having to re-cast the
+problem, and at times having to break the mold and re-implement functionality end-to-end.&lt;&#x2F;p&gt;
+&lt;p&gt;For more discussion, &lt;a href=&quot;http:&#x2F;&#x2F;timperrett.com&#x2F;2016&#x2F;11&#x2F;12&#x2F;frameworks-are-fundimentally-broken&#x2F;&quot;&gt;Tim Perrett&lt;&#x2F;a&gt; and
+&lt;a href=&quot;http:&#x2F;&#x2F;pchiusano.blogspot.com&#x2F;2010&#x2F;09&#x2F;push-libraries-vs-pull-libraries.html&quot;&gt;Paul Chiusano&lt;&#x2F;a&gt; have also written about this topic.
+Section 5 of the end-to-end paper also discusses many examples which ring of
+the frameworks vs. libraries debate.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;the-sidecar-pattern&quot;&gt;The sidecar pattern&lt;&#x2F;h3&gt;
+&lt;p&gt;For a systems-y example, a common pattern that has emerged in the world
+of schedulers and containers is the use of sidecars. The term sidecar is
+used to describe a container that run alongside the main
+application container to provide additional functionality such as proxying,
+logging, metrics, etc. Often times sidecars are automatically injected by
+the deployment system, the idea being that service owners need only concern
+themselves with their application.&lt;&#x2F;p&gt;
+&lt;p&gt;However, because sidecars run outside of the application, any functionality they
+provide must be done with incomplete information. For example, if the sidecar
+is a reverse proxy that does retries or load balancing, it must do so with
+limited information. Perhaps retries are done for any non-2xx status code,
+or load balancing just round robins. However, more sophisticated policies
+must be implemented at the application-level, such as a first-response-wins
+scatter-gather approach, or if the application wants to exploit
+knowledge of caching or data locality.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;tip-of-the-iceberg&quot;&gt;Tip of the iceberg&lt;&#x2F;h3&gt;
+&lt;p&gt;The examples I&#x27;ve presented above are only four among many examples I&#x27;ve run
+into the past couple of years. Some other examples include:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Reified generics vs. type erasure in language runtimes&lt;&#x2F;li&gt;
+&lt;li&gt;Green threads vs. OS threads&lt;&#x2F;li&gt;
+&lt;li&gt;Monolithic vs. two-level vs. shared-state cluster schedulers&lt;&#x2F;li&gt;
+&lt;li&gt;Prescriptive (&lt;a href=&quot;https:&#x2F;&#x2F;kubernetes.io&#x2F;&quot;&gt;Kubernetes&lt;&#x2F;a&gt;) vs. open systems (&lt;a href=&quot;https:&#x2F;&#x2F;www.hashicorp.com&#x2F;&quot;&gt;Hashistack&lt;&#x2F;a&gt;)&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;I encourage you as you design or evaluate systems to do so while keeping
+the end-to-end argument in mind. Rest assured as I
+&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;getnelson&#x2F;nelson&#x2F;issues&#x2F;79&quot;&gt;work on Nelson&lt;&#x2F;a&gt; I will too.&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>The Limitations of Type Classes as Subtyped Implicits at Scala&#x27;17</title>
+		<published>2017-09-20T00:00:00+00:00</published>
+		<updated>2017-09-20T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/typeclasses-scala17/" type="text/html"/>
+		<id>https://www.adelbertc.com/typeclasses-scala17/</id>
+		<content type="html">&lt;p&gt;I am excited to say my short paper &amp;quot;The Limitations of Type Classes as Subtyped
+Implicits&amp;quot; has been accepted at Scala Symposium 2017!&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;You can find a version of the paper &lt;a href=&quot;&#x2F;publications&#x2F;typeclasses-scala17.pdf&quot;&gt;here&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Installing NixOS</title>
+		<published>2017-08-13T00:00:00+00:00</published>
+		<updated>2017-08-13T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/installing-nixos/" type="text/html"/>
+		<id>https://www.adelbertc.com/installing-nixos/</id>
+		<content type="html">&lt;p&gt;In an effort to force myself to learn &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;&quot;&gt;Nix&lt;&#x2F;a&gt; I spent last weekend installing &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;&quot;&gt;NixOS&lt;&#x2F;a&gt; on my desktop. It ended
+up being a fairly involved process for me, especially since I barely have any experience with Linux. Therefore I&#x27;ve
+decided to write about my installation process (to the best of my recollection anyways), both as a reminder to myself
+and for anyone else who may be curious.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;Being new to Linux and easily sketched out, I tried my best to look up things I didn&#x27;t understand and will try to
+replicate the explanations I found.&lt;&#x2F;p&gt;
+&lt;p&gt;In terms of resources I consulted I used the &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nixos&#x2F;manual&#x2F;index.html#sec-installation&quot;&gt;NixOS manual&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;chris-martin.org&#x2F;2015&#x2F;installing-nixos&quot;&gt;Chris Martin&#x27;s blog post&lt;&#x2F;a&gt;,
+&lt;a href=&quot;https:&#x2F;&#x2F;gist.github.com&#x2F;martijnvermaat&#x2F;76f2e24d0239470dd71050358b4d5134&quot;&gt;Martijn Vermaat&#x27;s gist&lt;&#x2F;a&gt;, and the extremely helpful &lt;a href=&quot;https:&#x2F;&#x2F;wiki.archlinux.org&#x2F;&quot;&gt;ArchWiki&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;This post is based on the NixOS installation I did on August 6, 2017. Things may have changed between then and now.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;goals&quot;&gt;Goals&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;NixOS 17.03&lt;&#x2F;li&gt;
+&lt;li&gt;Installing on a completely separate hard drive (I was sketched out by NixOS sharing a hard drive with Windows)&lt;&#x2F;li&gt;
+&lt;li&gt;Desktop, not laptop (but this post should help laptop users as well)&lt;&#x2F;li&gt;
+&lt;li&gt;Create a bootable USB drive from Windows&lt;&#x2F;li&gt;
+&lt;li&gt;UEFI boot (it&#x27;s apparently the hip new thing)&lt;&#x2F;li&gt;
+&lt;li&gt;Encrypted disk&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;the-boring-stuff&quot;&gt;The boring stuff&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;creating-a-bootable-usb-drive&quot;&gt;Creating a bootable USB drive&lt;&#x2F;h2&gt;
+&lt;ol&gt;
+&lt;li&gt;Download the ISO from the &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nixos&#x2F;download.html&quot;&gt;NixOS site&lt;&#x2F;a&gt;. I used the &amp;quot;Graphical live CD&amp;quot; because it was marked
+recommended but this post does the install entirely with the console so the &amp;quot;Minimal installation&amp;quot; is probably fine
+as well.&lt;&#x2F;li&gt;
+&lt;li&gt;While the ISO is downloading find a USB drive with enough space for the ISO. Probably something with around 16GB
+of space.&lt;&#x2F;li&gt;
+&lt;li&gt;Download &lt;a href=&quot;https:&#x2F;&#x2F;rufus.akeo.ie&#x2F;&quot;&gt;Rufus&lt;&#x2F;a&gt;.&lt;&#x2F;li&gt;
+&lt;li&gt;Once the ISO is downloaded run Rufus. select MBR partitioning scheme for BIOS or UEFI (when I was installing
+I didn&#x27;t know I was going to decide on UEFI, choosing GPT here should be fine), FAT32 file system, and the default
+cluster size. Select the ISO, check Quick format for good measure, and I probably checked &amp;quot;Create extended label
+and icon files&amp;quot; as well.&lt;&#x2F;li&gt;
+&lt;li&gt;Hit Start to.. start. Rufus might prompt you if you want to use ISO or DD mode, pick DD. At the time of this writing
+the NixOS ISO seems to only like DD, and for non-Windows users the recommended way to mount the image is using &lt;code&gt;dd&lt;&#x2F;code&gt;
+anyways. It may also prompt you about downloading Syslinux files, click yes. It will just download these files in
+the same folder as wherever Rufus was started from, you can delete them after.&lt;&#x2F;li&gt;
+&lt;li&gt;Once it&#x27;s done, eject the drive and shut down your computer.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h2 id=&quot;disabling-secure-boot&quot;&gt;Disabling Secure Boot&lt;&#x2F;h2&gt;
+&lt;p&gt;If your motherboard has Secure Boot, you&#x27;ll need to disable it. Consult your motherboard manual on how to do so. I
+had an ASUS Z87-K, and this is what I did:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Find a USB drive with a bit of space on it (we&#x27;re going to copy some keys onto it so you don&#x27;t need that much).&lt;&#x2F;li&gt;
+&lt;li&gt;Shut down the computer and plug the USB drive in.&lt;&#x2F;li&gt;
+&lt;li&gt;Boot back up and spam F2 to go into the UEFI BIOS screen.&lt;&#x2F;li&gt;
+&lt;li&gt;Switch to &amp;quot;Advanced Mode.&amp;quot;&lt;&#x2F;li&gt;
+&lt;li&gt;Click &amp;quot;Boot&amp;quot; on the menu bar.&lt;&#x2F;li&gt;
+&lt;li&gt;Click on &amp;quot;Secure Boot.&amp;quot; Here I could see the &amp;quot;Secure boot state&amp;quot; which was enabled - if it shows up as disabled
+you can skip ahead.&lt;&#x2F;li&gt;
+&lt;li&gt;Click on &amp;quot;Key Mangement.&amp;quot;&lt;&#x2F;li&gt;
+&lt;li&gt;Click &amp;quot;Save Secure Boot Keys&amp;quot; and save it onto your USB drive. Presumably you can use this backup to load the PK
+key which we&#x27;re about to delete back in if something goes terribly wrong.&lt;&#x2F;li&gt;
+&lt;li&gt;Delete the PK key.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;This should disable Secure Boot.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;the-fun-stuff&quot;&gt;The fun stuff&lt;&#x2F;h1&gt;
+&lt;p&gt;If you&#x27;re paranoid like me, shut down your computer and disconnect everything but the drive you intend to install
+NixOS on.&lt;&#x2F;p&gt;
+&lt;p&gt;NixOS will want to download some stuff during installation so make sure you have an internet connection available.
+If you have a wired connection with DHCP setup then you&#x27;re good to go. If you have wired but no DHCP, be prepared
+to configure it manually with &lt;code&gt;ifconfig&lt;&#x2F;code&gt;. If you have wireless then refer to another guide (perhaps one of the ones
+I linked above) to set it up when I mention it later in this post.&lt;&#x2F;p&gt;
+&lt;p&gt;Boot up your computer and spam whatever key you need to drop into the boot menu (F8 for me). Select
+the UEFI boot from the USB and run the default NixOS installer. You should be dropped into a shell as &lt;code&gt;root&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;preparing-your-disk&quot;&gt;Preparing your disk&lt;&#x2F;h2&gt;
+&lt;p&gt;The &lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nixos&#x2F;manual&#x2F;index.html#sec-uefi-installation&quot;&gt;NixOS UEFI Installation guide&lt;&#x2F;a&gt; wants a
+GPT-partitioned drive with a UEFI boot partition formatted as a &lt;code&gt;vfat&lt;&#x2F;code&gt; filesystem.&lt;&#x2F;p&gt;
+&lt;p&gt;For the GPT partitioning we&#x27;re going to use &lt;code&gt;gdisk&lt;&#x2F;code&gt;. Here are some links to read up on &lt;code&gt;gdisk&lt;&#x2F;code&gt; and related tools:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;wiki.archlinux.org&#x2F;index.php&#x2F;Fdisk&quot;&gt;&lt;code&gt;fdisk&lt;&#x2F;code&gt; ArchWiki&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;http:&#x2F;&#x2F;www.tldp.org&#x2F;HOWTO&#x2F;Partition&#x2F;fdisk_partitioning.html&quot;&gt;TLDP&#x27;s Partitioning with fdisk&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;http:&#x2F;&#x2F;www.rodsbooks.com&#x2F;gdisk&#x2F;walkthrough.html&quot;&gt;Rod Smith&#x27;s &amp;quot;A gdisk Walkthrough&amp;quot;&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;At the end of this section we&#x27;ll have a partition table that looks like:&lt;&#x2F;p&gt;
+&lt;p&gt;+--------+------------+------+----------------------+
+| Number |  Size      | Code | Name                 |
++:=======+:===========+:=====+:=====================+
+| 1      | 500 MB     | EF00 | EFI System Partition |
++--------+------------+------+----------------------+
+| 2      | the rest   | 8E00 | Linux LVM            |
++--------+------------+-----------------------------+&lt;&#x2F;p&gt;
+&lt;p&gt;We will only encrypt the Linux LVM partition as the boot process will need to be able to read the EFI
+System Partition before prompting us for the encryption key.&lt;&#x2F;p&gt;
+&lt;p&gt;Chris&#x27;s post also has a 1 MB EF02 BIOS boot partition, but honestly writes &amp;quot;Don’t ask me exactly what this is for,
+all I know is it has to be there.&amp;quot; Seeing this I dug around and found on the
+&lt;a href=&quot;https:&#x2F;&#x2F;wiki.archlinux.org&#x2F;index.php&#x2F;GRUB&quot;&gt;GRUB ArchWiki&lt;&#x2F;a&gt; page &amp;quot;For UEFI systems [the BIOS boot partition] is not
+required, since no embedding of boot sectors takes place...However, UEFI systems still require an ESP.&amp;quot;
+The &lt;a href=&quot;https:&#x2F;&#x2F;wiki.archlinux.org&#x2F;index.php&#x2F;Fdisk&quot;&gt;Fdisk ArchWiki&lt;&#x2F;a&gt; page then says &amp;quot;GRUB requires a BIOS boot partition with code ef02.&amp;quot; NixOS usually
+gives the option of either using GRUB or systemd-boot, but for the UEFI install it defaults to systemd-boot. When I
+asked on the #nixos IRC channel about UEFI with GRUB, I was told that the two used to not play nicely together. Being
+the generally risk-averse person I am, I opted not to try.&lt;&#x2F;p&gt;
+&lt;p&gt;Now to actually do the partitioning.&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Identify your drive&#x27;s name with &lt;code&gt;fdisk  -l&lt;&#x2F;code&gt;. Be extremely sure of this because if you have other drives
+connected and you format the wrong one, the data is gone.&lt;&#x2F;li&gt;
+&lt;li&gt;Run &lt;code&gt;gdisk &amp;lt;drive name&amp;gt;&lt;&#x2F;code&gt;, e.g. &lt;code&gt;gdisk &#x2F;dev&#x2F;sda&lt;&#x2F;code&gt;.&lt;&#x2F;li&gt;
+&lt;li&gt;Hit &lt;code&gt;p&lt;&#x2F;code&gt; to print the partition table and confirm this is the drive you want to work with.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;o&lt;&#x2F;code&gt; to clear any partition table that may have previously been on the drive.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;p&lt;&#x2F;code&gt; to verify the table is clear.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;n&lt;&#x2F;code&gt; to add a new partition for the EFI System Partition. Use the default for the number and first sector, &lt;code&gt;+500M&lt;&#x2F;code&gt; for
+the last sector, and &lt;code&gt;EF00&lt;&#x2F;code&gt; for the hex code.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;n&lt;&#x2F;code&gt; again, now for the Linux LVM partition. Use the default for the number, first, and last sector (it will default
+to fill up the rest of the drive), and &lt;code&gt;8E00&lt;&#x2F;code&gt; for the hex code. Some guides suggest &lt;code&gt;8300&lt;&#x2F;code&gt; for Linux filesystem, I
+decided to use &lt;code&gt;8E00&lt;&#x2F;code&gt; since that&#x27;s what the
+&lt;a href=&quot;https:&#x2F;&#x2F;wiki.archlinux.org&#x2F;index.php&#x2F;Dm-crypt&#x2F;Encrypting_an_entire_system&quot;&gt;Dm-crypt ArchWiki&lt;&#x2F;a&gt; page suggests for the
+encrypted drive.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;p&lt;&#x2F;code&gt; to verify the state of the table.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;w&lt;&#x2F;code&gt; to save and apply the changes.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;Once that is done we can encrypt the drive with &lt;a href=&quot;https:&#x2F;&#x2F;gitlab.com&#x2F;cryptsetup&#x2F;cryptsetup&quot;&gt;LUKS&lt;&#x2F;a&gt; and throw a filesystem
+on top.&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;At the command line run &lt;code&gt;fdisk -l&lt;&#x2F;code&gt; and identify the names of your EFI System Partition and your Linux LVM partition.
+Write these down as we&#x27;ll need them in a bit. These should be something like &lt;code&gt;&#x2F;dev&#x2F;sda1&lt;&#x2F;code&gt; and &lt;code&gt;&#x2F;dev&#x2F;sda2&lt;&#x2F;code&gt;. For me it
+was &lt;code&gt;&#x2F;dev&#x2F;sdb1&lt;&#x2F;code&gt; and &lt;code&gt;&#x2F;dev&#x2F;sdb2&lt;&#x2F;code&gt;. I&#x27;m going to use &lt;code&gt;&amp;lt;boot partition&amp;gt;&lt;&#x2F;code&gt; to indicate the EFI System Partition name and
+&lt;code&gt;&amp;lt;lvm partition&amp;gt;&lt;&#x2F;code&gt; to indicate the Linux LVM partition. Be very careful not to mix these two names up.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;cryptsetup luksFormat &amp;lt;lvm partition&amp;gt;&lt;&#x2F;code&gt; to create the LUKS container at the specified partition. You will be
+prompted for the passphrase that will need to be entered whenever your boot into NixOS.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;cryptsetup luksOpen &amp;lt;lvm partition&amp;gt; enc-pv&lt;&#x2F;code&gt; to open the encrypted container. The container will then be available
+under &lt;code&gt;&#x2F;dev&#x2F;mapper&#x2F;enc-pv&lt;&#x2F;code&gt;. As far as I can tell the &amp;quot;enc-pv&amp;quot; is just a human-friendly name, I have
+seen other guides call this &lt;code&gt;crypted&lt;&#x2F;code&gt; or &lt;code&gt;cryptroot&lt;&#x2F;code&gt;. I use &lt;code&gt;enc-pv&lt;&#x2F;code&gt; because that&#x27;s what the guides I was following
+used and I&#x27;m paranoid.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;pvcreate &#x2F;dev&#x2F;mapper&#x2F;enc-pv&lt;&#x2F;code&gt; to create a physical volume on the partition.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;vgcreate vg &#x2F;dev&#x2F;mapper&#x2F;enc-pv&lt;&#x2F;code&gt; to create a volume group.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;lvcreate -L &amp;lt;# of GB of swap space you want&amp;gt;G -n swap vg&lt;&#x2F;code&gt; to create swap space. I wasn&#x27;t sure how much to put here
+and some preliminary searching led to long arguments about why an apparently old rule of 2 x (amount of RAM) is no
+longer necessary. I was lazy so I just put 16G, but you may want to put more thought into this than I.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;lvcreate -l &#x27;100%FREE&#x27; -n root vg&lt;&#x2F;code&gt; to allocate the rest of the partition for your root filesystem.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;mkfs.vfat -n BOOT &amp;lt;boot partition&amp;gt;&lt;&#x2F;code&gt; (not the LVM partition!!!) to format the boot partition, giving it a label
+of &amp;quot;BOOT.&amp;quot;&lt;&#x2F;li&gt;
+&lt;li&gt;I&#x27;m going to format the root filesystem at ext4 since that&#x27;s what the cool kids seem to use. If you want something
+else do your thing here. For ext4, &lt;code&gt;mkfs.ext4 -L root &#x2F;dev&#x2F;vg&#x2F;root&lt;&#x2F;code&gt;. This also gives it the label &amp;quot;root.&amp;quot;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;mkswap -L swap &#x2F;dev&#x2F;vg&#x2F;swap&lt;&#x2F;code&gt; to setup and name the swap.&lt;&#x2F;li&gt;
+&lt;li&gt;Now we mount the partitions. We&#x27;re going to mount at &lt;code&gt;&#x2F;mnt&lt;&#x2F;code&gt; since that&#x27;s what NixOS manual says to do.
+&lt;code&gt;mount &#x2F;dev&#x2F;vg&#x2F;root &#x2F;mnt&lt;&#x2F;code&gt; to mount the root filesystem.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;mkdir &#x2F;mnt&#x2F;boot&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;mount &amp;lt;boot partition&amp;gt; &#x2F;mnt&#x2F;boot&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;swapon &#x2F;dev&#x2F;vg&#x2F;swap&lt;&#x2F;code&gt; to activate swap.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h2 id=&quot;installing-nixos&quot;&gt;Installing NixOS&lt;&#x2F;h2&gt;
+&lt;p&gt;Finally, let&#x27;s generate the NixOS configuration files and get this show on the road.&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;nixos-generate-config --root &#x2F;mnt&lt;&#x2F;code&gt;. This will generate two configuration files under &lt;code&gt;&#x2F;mnt&#x2F;etc&#x2F;nixos&lt;&#x2F;code&gt;,
+&lt;code&gt;configuration.nix&lt;&#x2F;code&gt; which will hold the configuration for your whole system and what you will probably be changing
+not unfrequently, and &lt;code&gt;hardware-configuration.nix&lt;&#x2F;code&gt; which you probably shouldn&#x27;t touch.&lt;&#x2F;li&gt;
+&lt;li&gt;We&#x27;re going to need to refer to the LVM partition in a reliable way later, so run &lt;code&gt;blkid &amp;lt;lvm partition&amp;gt;&lt;&#x2F;code&gt; and write
+down the UUID associated with it.&lt;&#x2F;li&gt;
+&lt;li&gt;If you intend on using a wireless internet connection, this is about the time you should refer to another guide to
+get WiFi setup. If you&#x27;re using wired without DHCP, make sure you have that setup as well.&lt;&#x2F;li&gt;
+&lt;li&gt;Before booting into NixOS proper we need to tell it to expect an encrypted partition. Use &lt;code&gt;vim&lt;&#x2F;code&gt; or &lt;code&gt;nano&lt;&#x2F;code&gt; or
+something to open and edit &lt;code&gt;&#x2F;mnt&#x2F;etc&#x2F;nixos&#x2F;configuration.nix&lt;&#x2F;code&gt;.&lt;&#x2F;li&gt;
+&lt;li&gt;Add the following somewhere in the file:&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;boot&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;initrd&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;luks&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;devices &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; [
+  {
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;root&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;dev&#x2F;disk&#x2F;by-uuid&#x2F;&amp;lt;the aforementioned UUID here&amp;gt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;;
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;preLVM &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;;
+  }
+]&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;When I first did this I just put my LVM partition name under &lt;code&gt;device&lt;&#x2F;code&gt;, something like &lt;code&gt;device = &#x2F;dev&#x2F;sda2&lt;&#x2F;code&gt;. After I
+shut down my computer, reconnected my other hard drive, and rebooted my machine, NixOS complained about &lt;code&gt;&#x2F;dev&#x2F;sda2&lt;&#x2F;code&gt;
+being wonky. Apparently the names assigned to drives can vary across boots, and it&#x27;s not surprising connecting another
+drive can mess with how names are chosen. Therefore instead of referring to the root filesystem by name in the
+configuration we use the more reliable UUID.&lt;&#x2F;p&gt;
+&lt;ol start=&quot;6&quot;&gt;
+&lt;li&gt;Somewhere you should also see &lt;code&gt;boot.loader.systemd-boot.enable = true&lt;&#x2F;code&gt;. When I mentioned earlier that NixOS UEFI
+defaults to systemd-boot, this is what I was referring to.&lt;&#x2F;li&gt;
+&lt;li&gt;Save the file, and run &lt;code&gt;nixos-install&lt;&#x2F;code&gt; to apply the configuration. This will pull a bunch of packages down from
+upstream and do the Nix thing to get everything setup. If everything is OK it should prompt you for a password to
+use for root in your newly installed NixOS. If something went wrong it&#x27;ll stop and you just need to edit the
+configuration file again to fix your mistake.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;reboot&lt;&#x2F;code&gt; to reboot into your installed NixOS! Hopefully your boot order is configured so this just works, otherwise
+you may have to drop into the boot menu again to select the right drive.&lt;&#x2F;li&gt;
+&lt;li&gt;You should be prompted for your LUKS passphrase on startup, followed by your username and password. Use &lt;code&gt;root&lt;&#x2F;code&gt; and
+the password you chose in the previous step. If you are instead greeted with an error jump to the paragraph after
+this section.&lt;&#x2F;li&gt;
+&lt;li&gt;You&#x27;re done! You can now start following step 14 of the
+&lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;nixos&#x2F;manual&#x2F;index.html#ch-installation&quot;&gt;NixOS installation guide&lt;&#x2F;a&gt; or do your own thing.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;If your NixOS boot does not work, you mess up, or need to reboot for any reason, just boot from your USB drive in
+UEFI mode like before. To re-setup everything so you can fix the NixOS configuration:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Use &lt;code&gt;fdisk -l&lt;&#x2F;code&gt; to identify your boot partition and LVM  partition name.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;cryptsetup luksOpen &amp;lt;lvm partition&amp;gt; enc-pv&lt;&#x2F;code&gt; (or whatever friendly name you chose earlier).&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;lvchange -a y &#x2F;dev&#x2F;vg&#x2F;swap&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;lvchange -a y &#x2F;dev&#x2F;vg&#x2F;root&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;mount &#x2F;dev&#x2F;vg&#x2F;root &#x2F;mnt&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;mount &amp;lt;boot partition&amp;gt; &#x2F;mnt&#x2F;boot&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;swapon &#x2F;dev&#x2F;vg&#x2F;swap&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;You should then be able to edit &lt;code&gt;&#x2F;mnt&#x2F;etc&#x2F;nixos&#x2F;configuration.nix&lt;&#x2F;code&gt; as before.&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Reasoning with representable functors</title>
+		<published>2017-08-09T00:00:00+00:00</published>
+		<updated>2017-08-09T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/representable-functors/" type="text/html"/>
+		<id>https://www.adelbertc.com/representable-functors/</id>
+		<content type="html">&lt;p&gt;A couple weeks ago I was working on a project using Conal Elliott&#x27;s &lt;a href=&quot;https:&#x2F;&#x2F;hackage.haskell.org&#x2F;package&#x2F;uniform-pair&quot;&gt;uniform-pair&lt;&#x2F;a&gt; library and
+noticed it had a curious &lt;code&gt;Monad&lt;&#x2F;code&gt; instance, which I&#x27;ve reproduced below.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;data &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a a
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;instance Monad Pair where&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;
+  return a = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a a
+
+  m &amp;gt;&amp;gt;= f = joinP (f &amp;lt;$&amp;gt; m)
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;joinP &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;joinP (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a _) (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; _ d)) = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a d
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;I was especially curious about why &lt;code&gt;joinP&lt;&#x2F;code&gt; chose the first element of the first pair and the second element of
+the second pair. My initial guess was that it was determined by the &lt;code&gt;Functor&lt;&#x2F;code&gt; instance which would&#x27;ve looked something
+like..&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;fmapP &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;b&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;b
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;fmapP f (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (f x) (f y)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;For &lt;code&gt;Monad&lt;&#x2F;code&gt; to be consistent with &lt;code&gt;Functor&lt;&#x2F;code&gt; the follow equation should hold..&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;fmapP f p = p &amp;gt;&amp;gt;= (return . f)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;..but this didn&#x27;t really help.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) &amp;gt;&amp;gt;= (return . f)
+  = joinP ((return . f) &amp;lt;$&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y)
+  = joinP (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (f x) (f y)) (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (f x) (f y)))
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Taking either element of the outer pair would&#x27;ve been consistent with the &lt;code&gt;Functor&lt;&#x2F;code&gt; instance, as would taking the first
+element of the first pair and the second element of the second pair.&lt;&#x2F;p&gt;
+&lt;p&gt;A couple days later I was talking with Conal about it and he hinted at using the fact that uniform pairs are
+&lt;a href=&quot;https:&#x2F;&#x2F;ncatlab.org&#x2F;nlab&#x2F;show&#x2F;representable+functor&quot;&gt;representable functors&lt;&#x2F;a&gt;. For a functor to be representable in Haskell&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#1&quot;&gt;1&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt; means it is isomorphic to
+the set of functions from &lt;code&gt;X&lt;&#x2F;code&gt;, for some fixed &lt;code&gt;X&lt;&#x2F;code&gt; (this &amp;quot;set of functions from X&amp;quot; is also known as the reader monad).
+For uniform pairs, &lt;code&gt;X = Bool&lt;&#x2F;code&gt;. Indeed, the following functions are mutual inverses.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;to &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Bool -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;to (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x _) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= x
+to (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; _ y) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= y
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;from &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Bool -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;from f = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) (f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;To prove that a functor &lt;code&gt;f&lt;&#x2F;code&gt; is representable in Haskell is to implement the &lt;code&gt;Representable&lt;&#x2F;code&gt; type class. The
+following is reproduced from the &lt;a href=&quot;https:&#x2F;&#x2F;hackage.haskell.org&#x2F;package&#x2F;representable-functors&quot;&gt;representable-functors&lt;&#x2F;a&gt; package.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;class &lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Representable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;where
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;index &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Key &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a
+
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;tabulate &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Key &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f a
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The &lt;code&gt;Key f&lt;&#x2F;code&gt; refers to the fixed &lt;code&gt;X&lt;&#x2F;code&gt; mentioned above, so &lt;code&gt;Key Pair = Bool&lt;&#x2F;code&gt;. Substituing &lt;code&gt;Bool&lt;&#x2F;code&gt; for &lt;code&gt;Key f&lt;&#x2F;code&gt; reveals
+signatures matching the &lt;code&gt;to&lt;&#x2F;code&gt; (&lt;code&gt;index&lt;&#x2F;code&gt;) and &lt;code&gt;from&lt;&#x2F;code&gt; (&lt;code&gt;tabulate&lt;&#x2F;code&gt;) functions&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#2&quot;&gt;2&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;As it turns out every &lt;code&gt;Representable&lt;&#x2F;code&gt; has a canonical monadic return and bind, defined as:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;returnRep &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: Representable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;=&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f a
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;returnRep = tabulate . const
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;bindRep &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: Representable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;=&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f b&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;f b
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;bindRep m f = tabulate (\a -&amp;gt; index (f (index m a)) a)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Let&#x27;s see what this looks like for &lt;code&gt;Pair&lt;&#x2F;code&gt;. First let&#x27;s do some substitution on &lt;code&gt;returnRep&lt;&#x2F;code&gt;:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;returnRep &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;returnRep a
+  = (tabulate . const) a
+  = tabulate (const a)
+  = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (const a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) (const a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- Pair&amp;#39;s tabulate = from
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a a
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;That matches our &lt;code&gt;return&lt;&#x2F;code&gt; definition above. Now let&#x27;s do the same for &lt;code&gt;bindRep&lt;&#x2F;code&gt;:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;bindRep &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;:: Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;b&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;-&amp;gt; Pair &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;b
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;bindRep (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) f
+  = tabulate (\a -&amp;gt; index (f (index (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) a)) a)
+  = tabulate g              &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- call the lambda &amp;#39;g&amp;#39;
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; (g &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) (g &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- Pair&amp;#39;s tabulate = from
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Now substituting &lt;code&gt;False&lt;&#x2F;code&gt; and &lt;code&gt;True&lt;&#x2F;code&gt; into the lambda:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- g False
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= index (f (index (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;)) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= index (f x) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;False     &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- Pair&amp;#39;s index = to
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= first element &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;of&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; f x  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- Pair&amp;#39;s index = to
+
+-- g True
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= index (f (index (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;)) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= index (f y) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;True      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- Pair&amp;#39;s index = to
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;= second element &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;of&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; f y &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- Pair&amp;#39;s index = to
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Thus:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;bindRep (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; x y) f
+  = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Pair&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; a d &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;-- where Pair (Pair a _) (Pair _ d)
+--                          ^ f x      ^ f y
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The same as &lt;code&gt;joinP&lt;&#x2F;code&gt; above.&lt;&#x2F;p&gt;
+&lt;p&gt;This is awesome. By starting with the &lt;em&gt;meaning&lt;&#x2F;em&gt; of his data type, Conal discovered the only
+natural type class instance consistent with the meaning. While in this case I started with the instance and worked
+my way back, I believe the more useful and consistent approach is to think hard about your data type&#x27;s
+&lt;a href=&quot;http:&#x2F;&#x2F;conal.net&#x2F;papers&#x2F;type-class-morphisms&#x2F;&quot;&gt;denotation&lt;&#x2F;a&gt; and work your way forward.&lt;&#x2F;p&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;1&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;1&lt;&#x2F;sup&gt;
+&lt;p&gt;Specifically I mean the $Hask$ category with types as objects and functions as arrows.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;2&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;2&lt;&#x2F;sup&gt;
+&lt;p&gt;In general the type class law for &lt;code&gt;Representable&lt;&#x2F;code&gt; requires &lt;code&gt;index&lt;&#x2F;code&gt; and &lt;code&gt;tabulate&lt;&#x2F;code&gt; to be mutual inverses.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>My first Nix derivation</title>
+		<published>2017-04-08T00:00:00+00:00</published>
+		<updated>2017-04-08T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/first-nix-derivation/" type="text/html"/>
+		<id>https://www.adelbertc.com/first-nix-derivation/</id>
+		<content type="html">&lt;p&gt;When I started learning Nix I set myself a milestone of contributing a derivation
+to Nixpkgs. Along the way I learned some interesting things about the Nix toolchain
+and began to really appreciate the freedom it gave me to experiment.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;I noticed &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;coursier&#x2F;coursier&quot;&gt;Coursier&lt;&#x2F;a&gt; was not in Nixpkgs and decided it would
+be a good project to complete my milestone. The fact that it has a
+&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;coursier&#x2F;coursier#command-line&quot;&gt;pretty easy install&lt;&#x2F;a&gt; helped as well. In this post I have tried to reproduce
+my thought process in writing the derivation, though in some places I have altered
+history for a (ostensibly) better narrative.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;monkey-see-monkey-do&quot;&gt;Monkey see, monkey do&lt;&#x2F;h2&gt;
+&lt;p&gt;When I started on this I had read the &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;manual&#x2F;#chap-writing-nix-expressions&quot;&gt;Nix manual chapter on expressions&lt;&#x2F;a&gt;,
+the &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nixpkgs&#x2F;manual&#x2F;&quot;&gt;Nixpkgs manual&lt;&#x2F;a&gt;, and &lt;a href=&quot;https:&#x2F;&#x2F;medium.com&#x2F;@MrJamesFisher&#x2F;nix-by-example-a0063a1a4c55&quot;&gt;Nix by example&lt;&#x2F;a&gt;. These were
+all good resources, but I still felt lost as to how to get started. I eventually decided
+to start by looking at and copying the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;NixOS&#x2F;nixpkgs&#x2F;blob&#x2F;master&#x2F;pkgs&#x2F;development&#x2F;tools&#x2F;ammonite&#x2F;default.nix&quot;&gt;Nix expression&lt;&#x2F;a&gt; for
+&lt;a href=&quot;http:&#x2F;&#x2F;www.lihaoyi.com&#x2F;Ammonite&#x2F;&quot;&gt;Ammonite&lt;&#x2F;a&gt; which has a similar install process as Coursier.&lt;&#x2F;p&gt;
+&lt;p&gt;I cloned the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;NixOS&#x2F;nixpkgs&quot;&gt;Nixpkgs repository&lt;&#x2F;a&gt; and copied
+the Ammonite expression into &lt;code&gt;.&#x2F;nixpkgs&#x2F;pkgs&#x2F;development&#x2F;tools&#x2F;coursier&#x2F;default.nix&lt;&#x2F;code&gt;&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#1&quot;&gt;1&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;,
+changing the appropriate values and removing what I thought unnecessary or didn&#x27;t understand.
+This left me with the following expression.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{ stdenv, fetchurl }:
+
+stdenv.mkDerivation rec {
+  name    = &amp;quot;coursier-${version}&amp;quot;;
+  version = &amp;quot;1.0.0-M15-5&amp;quot;;
+
+  src = fetchurl {
+    url    = &amp;quot;https:&#x2F;&#x2F;github.com&#x2F;coursier&#x2F;coursier&#x2F;raw&#x2F;v${version}&#x2F;coursier&amp;quot;;
+    sha256 = &amp;quot;610c5fc08d0137c5270cefd14623120ab10cd81b9f48e43093893ac8d00484c9&amp;quot;;
+  };
+
+  installPhase = &amp;#39;&amp;#39;
+    mkdir -p $out&#x2F;bin
+    cp ${src} $out&#x2F;bin&#x2F;coursier
+    chmod +x $out&#x2F;bin&#x2F;coursier
+  &amp;#39;&amp;#39;;
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This expression is specifically a function, the arguments of which are on line 1.
+Without getting into too much detail&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#2&quot;&gt;2&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt; &lt;code&gt;stdenv&lt;&#x2F;code&gt; provides basic tools
+like Bash and &lt;code&gt;cp&lt;&#x2F;code&gt;, and &lt;code&gt;fetchurl&lt;&#x2F;code&gt; provides a way to well, fetch from
+a URL.&lt;&#x2F;p&gt;
+&lt;p&gt;In the body of the function I make a derivation - a derivation describes how to
+build a package from source. &lt;code&gt;stdenv.mkDerivation&lt;&#x2F;code&gt; is a convenience function that
+takes a set of standard attributes which it will use to create a derivation.
+The &lt;code&gt;rec&lt;&#x2F;code&gt; allows attributes within the set to refer to each other, such as &lt;code&gt;version&lt;&#x2F;code&gt;
+in the definition of &lt;code&gt;name&lt;&#x2F;code&gt;. The rest reads pretty declaratively.&lt;&#x2F;p&gt;
+&lt;p&gt;The &lt;code&gt;installPhase&lt;&#x2F;code&gt; uses tools like &lt;code&gt;mkdir&lt;&#x2F;code&gt;, &lt;code&gt;cp&lt;&#x2F;code&gt;, and &lt;code&gt;chmod&lt;&#x2F;code&gt; - these are provided
+by &lt;code&gt;stdenv&lt;&#x2F;code&gt;. If I omitted the &lt;code&gt;stdenv&lt;&#x2F;code&gt; argument these tools would not be available
+to me (nor would I be able to call &lt;code&gt;stdenv.mkDerivation&lt;&#x2F;code&gt;).&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;installPhase&lt;&#x2F;code&gt; also references &lt;code&gt;${src}&lt;&#x2F;code&gt; and &lt;code&gt;$out&lt;&#x2F;code&gt;. The choice to use or omit
+braces here is not accidental - with braces the contents will be expanded within Nix
+and without braces the contents will be expanded in Bash (using environment variables).
+Here this means &lt;code&gt;${src}&lt;&#x2F;code&gt; will interpolate the result of the &lt;code&gt;src&lt;&#x2F;code&gt; attribute (line 7) into
+the Nix expression during evaluation, and &lt;code&gt;$out&lt;&#x2F;code&gt; will be filled in by Bash at
+install time by looking for an &lt;code&gt;$out&lt;&#x2F;code&gt; environment variable (more on this in a bit).&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;testing&quot;&gt;Testing&lt;&#x2F;h2&gt;
+&lt;p&gt;Now I wanted to test this function by running it through Nix and making sure everything
+was OK. So far I had just written a function but it needed to be called to actually create
+the derivation and run the builder. This occurs in &lt;code&gt;nixpkgs&#x2F;pkgs&#x2F;top-level&#x2F;all-packages.nix&lt;&#x2F;code&gt;
+which contains the set of all Nix packages. The code is organized by the type of
+package - Coursier is a tool so I put the following under the Tools section, copied again
+from what I saw other packages do.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;coursier = callPackage ..&#x2F;development&#x2F;tools&#x2F;coursier {};
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;code&gt;callPackage&lt;&#x2F;code&gt; is another convenience function that takes the path of a Nix function and calls
+it, filling in the arguments by looking for an attribute of the same name in the surrounding
+set of Nixpkgs. For instance the &lt;code&gt;stdenv&lt;&#x2F;code&gt; argument is filled in by looking for the
+&lt;code&gt;stdenv&lt;&#x2F;code&gt; attribute in the Nixpkgs set.&lt;&#x2F;p&gt;
+&lt;p&gt;With that in place, I ran &lt;code&gt;nix-build -A coursier -K&lt;&#x2F;code&gt; in the root of the &lt;code&gt;nixpkgs&lt;&#x2F;code&gt; directory.
+This command builds and installs &lt;code&gt;coursier&lt;&#x2F;code&gt;, placing a &lt;code&gt;result&lt;&#x2F;code&gt; symlink to the install in the current
+directory. Running &lt;code&gt;nix-build&lt;&#x2F;code&gt; in the &lt;code&gt;nixpkgs&lt;&#x2F;code&gt; directory makes Nix use our local copy
+instead of going somewhere else to look for it&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#3&quot;&gt;3&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;. The &lt;code&gt;-K&lt;&#x2F;code&gt;
+tells Nix to keep the temporary directory used for the build even in the event of a failure, which is
+useful for debugging.&lt;&#x2F;p&gt;
+&lt;p&gt;After running that command I was greeted with a wall of scrolling text which
+eventually ended in:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;building path(s) ‘&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier-1.0.0-M15-5’
+unpacking sources
+unpacking source archive &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier
+do not know how to unpack source archive &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier
+note: keeping build directory ‘&#x2F;...&#x2F;nix-build-coursier-1.0.0-M15-5.drv-0’
+builder for ‘&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier-1.0.0-M15-5.drv’ failed with exit code 1
+error: build of ‘&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier-1.0.0-M15-5.drv’ failed
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Two lines here stood out to me: the fourth line indicating the error, and the one
+following it giving the path of the aforementioned temporary directory.&lt;&#x2F;p&gt;
+&lt;p&gt;Looking into the directory there was just one file named &lt;code&gt;env-vars&lt;&#x2F;code&gt;. I have
+reproduced a subset of the contents below.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;declare -x name=&amp;quot;coursier-1.0.0-M15-5&amp;quot;
+declare -x nativeBuildInputs=&amp;quot;&amp;quot;
+declare -x out=&amp;quot;&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier-1.0.0-M15-5&amp;quot;
+declare -x src=&amp;quot;&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier&amp;quot;
+declare -x version=&amp;quot;1.0.0-M15-5&amp;quot;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Many of these lines declare variables sharing the same names as the attributes
+given to &lt;code&gt;mkDerivation&lt;&#x2F;code&gt;. Of particular interest is the &lt;code&gt;out&lt;&#x2F;code&gt; variable which I
+referenced earlier. Here Nix had automatically set it to be the path that Coursier
+was going to be installed into.&lt;&#x2F;p&gt;
+&lt;p&gt;As for the error, I was very confused when I first read it. It suggested
+Nix was unable to &amp;quot;unpack&amp;quot; something, but I wasn&#x27;t trying to
+unpack anything - the Coursier download was a single file.
+Looking through the Nix manual some more, I realized &lt;code&gt;mkDerivation&lt;&#x2F;code&gt; had some default
+behavior I did not want. It assumed the source fetched was
+compressed in something like a tarball (which is often the case) so it tried
+to take extra steps behind the scenes to unpack it. Since Coursier was not compressed
+unpacking it would be futile, hence the error.&lt;&#x2F;p&gt;
+&lt;p&gt;The individual steps &lt;code&gt;mkDerivation&lt;&#x2F;code&gt; takes to install is specified by the
+&lt;code&gt;phases&lt;&#x2F;code&gt; attribute. Omitting this attribute makes &lt;code&gt;mkDerivation&lt;&#x2F;code&gt;
+use the aformentioned default behavior. In my case I just wanted the one phase, thus&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#4&quot;&gt;4&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{ stdenv, fetchurl }:
+
+stdenv.mkDerivation rec {
+  name    = &amp;quot;coursier-${version}&amp;quot;;
+  version = &amp;quot;1.0.0-M15-5&amp;quot;;
+
+  src = fetchurl {
+    url    = &amp;quot;https:&#x2F;&#x2F;github.com&#x2F;coursier&#x2F;coursier&#x2F;raw&#x2F;v${version}&#x2F;coursier&amp;quot;;
+    sha256 = &amp;quot;610c5fc08d0137c5270cefd14623120ab10cd81b9f48e43093893ac8d00484c9&amp;quot;;
+  };
+
+  phases = &amp;quot;installPhase&amp;quot;;
+
+  installPhase = &amp;#39;&amp;#39;
+    mkdir -p $out&#x2F;bin
+    cp ${src} $out&#x2F;bin&#x2F;coursier
+    chmod +x $out&#x2F;bin&#x2F;coursier
+  &amp;#39;&amp;#39;;
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;I ran the &lt;code&gt;nix-build&lt;&#x2F;code&gt; command again and this time it worked, leaving a &lt;code&gt;result&lt;&#x2F;code&gt;
+symlink in the current directory.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ ls -l result
+result -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier-1.0.0-M15-5
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Coursier was now installed in my Nix store, but referenced only by this symlink. This
+means if I deleted the symlink and ran the garbage collector, my system would be as
+it was before. As someone who tries to keep a clean system, knowing this really
+helped put me at ease.&lt;&#x2F;p&gt;
+&lt;p&gt;I then ran &lt;code&gt;.&#x2F;result&#x2F;bin&#x2F;coursier --help&lt;&#x2F;code&gt; which produced the expected help message,
+letting me know the install succeeded.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;or-did-it&quot;&gt;Or did it?&lt;&#x2F;h2&gt;
+&lt;p&gt;At this point I was ready to call it done and submit a pull request. However, I
+soon remembered that running Coursier the way I did did not mean my Nix expression
+was correct - it was possible my computer&#x27;s configuration had an effect. Because Nix&#x27;s
+model wants all dependencies to be explicitly declared, my job was not done.&lt;&#x2F;p&gt;
+&lt;p&gt;Thankfully, Nix provides a way to test this. Running
+&lt;code&gt;nix-shell -A coursier --pure&lt;&#x2F;code&gt; in the &lt;code&gt;nixpkgs&lt;&#x2F;code&gt; directory drops me into a
+shell with nothing on my &lt;code&gt;PATH&lt;&#x2F;code&gt; except for what is declared as Coursier&#x27;s
+dependencies. This effectively replicates the environment used to build Coursier.&lt;&#x2F;p&gt;
+&lt;p&gt;Here&#x27;s what happened when I tried to run &lt;code&gt;.&#x2F;result&#x2F;bin&#x2F;coursier --help&lt;&#x2F;code&gt; from
+that shell.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ nix-shell -A coursier --pure
+
+[nix-shell:~&#x2F;github&#x2F;nixpkgs]$ .&#x2F;result&#x2F;bin&#x2F;coursier --help
+.&#x2F;result&#x2F;bin&#x2F;coursier: line 2: exec: java: not found
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Uh oh. It turns out that Coursier needs Java to run (it is written in Scala) and
+when I ran it earlier it was picking up Java from my own configured &lt;code&gt;PATH&lt;&#x2F;code&gt;.
+Inside a pure Nix shell there was no Java, so it errored out. The derivation needed
+to be fixed.&lt;&#x2F;p&gt;
+&lt;p&gt;I went back and revisited the Ammonite derivation, looking at what I had removed.
+I knew that like Coursier, Ammonite was downloaded as a single script which referenced
+&lt;code&gt;java&lt;&#x2F;code&gt; (it too was written in Scala), and wanted to see how it handled that.
+I noticed it had a dependency on &lt;code&gt;jre&lt;&#x2F;code&gt; which sounded like what I wanted,
+but it also had this &lt;code&gt;makeWrapper&lt;&#x2F;code&gt; thing that was used in the install process.&lt;&#x2F;p&gt;
+&lt;p&gt;A quick search turned up the Nix wiki article on the
+&lt;a href=&quot;https:&#x2F;&#x2F;nixos.org&#x2F;wiki&#x2F;Nix_Runtime_Environment_Wrapper&quot;&gt;Nix Runtime Environment Wrapper&lt;&#x2F;a&gt; which outlined what &lt;code&gt;makeWrapper&lt;&#x2F;code&gt;
+was used for.&lt;&#x2F;p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;The makeWrapper package adds a shell function, wrapProgram, which will ensure the
+specified program has the specified environment when it is executed.&lt;&#x2F;p&gt;
+&lt;&#x2F;blockquote&gt;
+&lt;p&gt;The use of &lt;code&gt;makeWrapper&lt;&#x2F;code&gt; now made sense - since Ammonte, like Coursier, blindly calls &lt;code&gt;java&lt;&#x2F;code&gt; it
+expects there to be one on the &lt;code&gt;PATH&lt;&#x2F;code&gt;. By using &lt;code&gt;makeWrapper&lt;&#x2F;code&gt; I could add the
+JRE to the &lt;code&gt;PATH&lt;&#x2F;code&gt; before calling the script.&lt;&#x2F;p&gt;
+&lt;p&gt;In general the way &lt;code&gt;makeWrapper&lt;&#x2F;code&gt; works is by renaming the target file by prepending
+the name with a &lt;code&gt;.&lt;&#x2F;code&gt; and appending it with &lt;code&gt;-wrapped&lt;&#x2F;code&gt;. A new file is then created
+with the original name which sets the &lt;code&gt;PATH&lt;&#x2F;code&gt; according to the arguments passed to it
+before calling the original script.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;makeWrapper&lt;&#x2F;code&gt; also needs to be specified in &lt;code&gt;nativeBuildInputs&lt;&#x2F;code&gt; - this makes it so
+&lt;code&gt;makeWrapper&lt;&#x2F;code&gt; is available at install time but discarded afterwards.&lt;&#x2F;p&gt;
+&lt;p&gt;Adding these modifications gave:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;{ stdenv, fetchurl, makeWrapper, jre }:
+
+stdenv.mkDerivation rec {
+  name    = &amp;quot;coursier-${version}&amp;quot;;
+  version = &amp;quot;1.0.0-M15-5&amp;quot;;
+
+  src = fetchurl {
+    url    = &amp;quot;https:&#x2F;&#x2F;github.com&#x2F;coursier&#x2F;coursier&#x2F;raw&#x2F;v${version}&#x2F;coursier&amp;quot;;
+    sha256 = &amp;quot;610c5fc08d0137c5270cefd14623120ab10cd81b9f48e43093893ac8d00484c9&amp;quot;;
+  };
+
+  nativeBuildInputs = [ makeWrapper ];
+
+  phases = &amp;quot;installPhase&amp;quot;;
+
+  installPhase = &amp;#39;&amp;#39;
+    mkdir -p $out&#x2F;bin
+    cp ${src} $out&#x2F;bin&#x2F;coursier
+    chmod +x $out&#x2F;bin&#x2F;coursier
+    wrapProgram $out&#x2F;bin&#x2F;coursier --prefix PATH &amp;quot;:&amp;quot; ${jre}&#x2F;bin ;
+  &amp;#39;&amp;#39;;
+}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;I then ran it through &lt;code&gt;nix-build&lt;&#x2F;code&gt; and dropped into the &lt;code&gt;nix-shell&lt;&#x2F;code&gt; again.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;[nix-shell:~&#x2F;github&#x2F;nixpkgs]$ ls -a result&#x2F;bin&#x2F;
+.  ..  .coursier-wrapped  coursier
+
+[nix-shell:~&#x2F;github&#x2F;nixpkgs]$ cat result&#x2F;bin&#x2F;coursier
+#! &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-bash-4.4-p12&#x2F;bin&#x2F;bash -e
+export PATH=&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-zulu1.8.0_121-8.20.0.5&#x2F;bin${PATH:+:}$PATH
+exec -a &amp;quot;$0&amp;quot; &amp;quot;&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-coursier-1.0.0-M15-5&#x2F;bin&#x2F;.coursier-wrapped&amp;quot;  &amp;quot;${extraFlagsArray[@]}&amp;quot; &amp;quot;$@&amp;quot;
+
+[nix-shell:~&#x2F;github&#x2F;nixpkgs]$ .&#x2F;result&#x2F;bin&#x2F;coursier --help
+Coursier 1.0.0-M15
+Usage: coursier [options] [command] [command-options]
+
+Available commands: bootstrap, fetch, launch, resolve, spark-submit
+
+Type  coursier command --help  for help on an individual command
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Hurrah!&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;finishing-up&quot;&gt;Finishing up&lt;&#x2F;h2&gt;
+&lt;p&gt;All that was left now was to give some meta-information and submit
+the pull request. The meta attribute just gives descriptive information
+about the package itself such as its homepage and description.
+I&#x27;ve reproduced the meta information I gave for Coursier below.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;meta = with stdenv.lib; {
+  homepage    = http:&#x2F;&#x2F;get-coursier.io&#x2F;;
+  description = &amp;quot;A Scala library to fetch dependencies from Maven &#x2F; Ivy repositories&amp;quot;;
+  license     = licenses.asl20;
+};
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;With that in place, I filed the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;NixOS&#x2F;nixpkgs&#x2F;pull&#x2F;24108&quot;&gt;pull request&lt;&#x2F;a&gt;, got some feedback,
+addressed them, and a day later it was merged!&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;don-t-just-read-do&quot;&gt;Don&#x27;t just read, do&lt;&#x2F;h2&gt;
+&lt;p&gt;The majority of my process during this project involved digging around the codebase,
+copying code, and figuring out what it did. I do believe this is a perfectly good
+way of learning things especially when you&#x27;re first getting started, so long as you work
+hard to understand the things you&#x27;re copying (a good way to do this is
+to delete anything you don&#x27;t understand and seeing what the consequences are).
+In writing the expression for Coursier I learned about the subtle default behaviors of
+&lt;code&gt;mkDerivation&lt;&#x2F;code&gt; and how to use &lt;code&gt;nix-build&lt;&#x2F;code&gt; and &lt;code&gt;nix-shell&lt;&#x2F;code&gt; to test without fear.&lt;&#x2F;p&gt;
+&lt;p&gt;If you get stuck,
+search around the manual, the wiki, or ask questions on the &lt;code&gt;#nixos&lt;&#x2F;code&gt; IRC channel.
+I asked many questions in the IRC channel and the answers were always very
+helpful and instructive.&lt;&#x2F;p&gt;
+&lt;p&gt;At the end of the day what&#x27;s most important is getting started and actually writing code&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;you can only read so much before you stop internalizing information.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;1&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;1&lt;&#x2F;sup&gt;
+&lt;p&gt;I decided on this path by poking around Nixpkgs and seeing where a tool like Coursier would fit.
+I saw Ammonite was under development tools and figured Coursier would fit under there too.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;2&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;2&lt;&#x2F;sup&gt;
+&lt;p&gt;For a more in-depth discussion about these, refer to the &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;manual&#x2F;#chap-writing-nix-expressions&quot;&gt;Nix manual&lt;&#x2F;a&gt; section
+on Nix expressions.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;3&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;3&lt;&#x2F;sup&gt;
+&lt;p&gt;Specifically &lt;code&gt;nix-build&lt;&#x2F;code&gt; will use the &lt;code&gt;default.nix&lt;&#x2F;code&gt; file in the current directory to configure
+itself if no path is specified.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;4&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;4&lt;&#x2F;sup&gt;
+&lt;p&gt;I could have written &lt;code&gt;[&amp;quot;installPhases&amp;quot;]&lt;&#x2F;code&gt; which would have made it a list (and perhaps be the
+more accurate thing to do) and it would have continued to work. Since Nix is dynamically typed it is
+fine with either a string or list here.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>My journey into Nix</title>
+		<published>2017-04-03T00:00:00+00:00</published>
+		<updated>2017-04-03T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/nix-journey/" type="text/html"/>
+		<id>https://www.adelbertc.com/nix-journey/</id>
+		<content type="html">&lt;p&gt;As a Windows user for many years, I always liked that there was a
+way to uninstall any program I installed&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#1&quot;&gt;1&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;. When I moved to Mac OS and
+installed programs through the App Store, &lt;code&gt;brew&lt;&#x2F;code&gt;, &lt;code&gt;pip&lt;&#x2F;code&gt;, I quickly
+realized I had no clue how to reliably uninstall them. This made me quite
+uncomfortable, but I managed to live with it.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;A few years later I heard about &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;&quot;&gt;Nix&lt;&#x2F;a&gt; and how it solved exactly
+this problem. At a glance it seemed like a good approach, but I never
+got around to trying it until recently. So far I&#x27;ve been really liking
+what I&#x27;ve seen and wanted to share what I learned.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;what-is-nix&quot;&gt;What is Nix?&lt;&#x2F;h2&gt;
+&lt;p&gt;Nix is a cross-platform package manager, working across Linux variants,
+Mac OS, and Windows.&lt;&#x2F;p&gt;
+&lt;p&gt;Nix is also a pure functional package manager, treating package installs
+like a pure functional data structure. Where most package managers update
+packages by mutating the install in-place, Nix installs new versions in
+a separate location and shuffles some &amp;quot;pointers&amp;quot; to point to the new one.
+The old one continues to exist in its original location - that is, until
+the garbage collector is run.&lt;&#x2F;p&gt;
+&lt;p&gt;Let&#x27;s see what this actually means.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;the-nix-store&quot;&gt;The Nix store&lt;&#x2F;h3&gt;
+&lt;p&gt;Nix installs packages in the &lt;em&gt;Nix store&lt;&#x2F;em&gt;, located by default under &lt;code&gt;&#x2F;nix&#x2F;store&lt;&#x2F;code&gt;.
+Everything lives in the Nix store, including Nix itself&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#2&quot;&gt;2&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;. Installing a package
+&lt;code&gt;foo&lt;&#x2F;code&gt; through Nix installs it into &lt;code&gt;&#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-foo-&amp;lt;version&amp;gt;&lt;&#x2F;code&gt;. The configuration
+of &lt;code&gt;foo&lt;&#x2F;code&gt; determines the hash and its version determines, well, the version. This
+means for any given package, the following are installed in different locations:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Different configuration, different version&lt;&#x2F;li&gt;
+&lt;li&gt;Different configuration, same version&lt;&#x2F;li&gt;
+&lt;li&gt;Same configuration, different version&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;Thus, installing different configurations or versions is not destructive&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;the old version continues to exist in a different location. This is what makes
+Nix purely functional.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;If an install has dependencies (e.g. &lt;a href=&quot;http:&#x2F;&#x2F;www.scala-sbt.org&#x2F;&quot;&gt;sbt&lt;&#x2F;a&gt; depends
+on a JDK), those dependencies are installed under their corresponding
+&lt;code&gt;&amp;lt;hash&amp;gt;-&amp;lt;package&amp;gt;-&amp;lt;version&amp;gt;&lt;&#x2F;code&gt; folder. If two or more packages require the same
+dependency, that dependency is shared&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#3&quot;&gt;3&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;Here are some basic commands to get started with Nix. You may want
+to run &lt;code&gt;nix-channel --update&lt;&#x2F;code&gt; before to make sure you have
+the latest set of packages. Nix channels will be discussed later in this post.&lt;&#x2F;p&gt;
+&lt;p&gt;+----------------------+-----------------------------------------------------------+
+| Command              | Description                                               |
++:=====================+:==========================================================+
+| &lt;code&gt;nix-env -qaP [pkg]&lt;&#x2F;code&gt; | Check to see if [pkg] is available through Nix, showing   |
+|                      | its Nix attribute path if available.                      |
++----------------------+-----------------------------------------------------------+
+| &lt;code&gt;nix-env -iA [attr]&lt;&#x2F;code&gt; | Install a package by its attribute path [attr].           |
++----------------------+-----------------------------------------------------------+
+| &lt;code&gt;nix-env -u [pkg]&lt;&#x2F;code&gt;   | Update [pkg]. We can add &lt;code&gt;--dry-run&lt;&#x2F;code&gt; to see what would    |
+|                      | be installed without actually updating if we&#x27;re nervous.  |
++----------------------+-----------------------------------------------------------+
+| &lt;code&gt;nix-env -e [pkg]&lt;&#x2F;code&gt;   | &amp;quot;Uninstalls&amp;quot; [pkg] - read the next section to learn what  |
+|                      | actually happens when we uninstall a package.             |
++----------------------+-----------------------------------------------------------+&lt;&#x2F;p&gt;
+&lt;p&gt;Please refer to the &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;manual&#x2F;&quot;&gt;Nix manual&lt;&#x2F;a&gt; for more information on these commands.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;how-nix-manages-packages&quot;&gt;How Nix manages packages&lt;&#x2F;h3&gt;
+&lt;p&gt;Given this hash-based install scheme, how do we actually use a package
+after it&#x27;s installed? It would be annoying if we had to manually specify
+the path of the package we wanted, hash and all. Nix&#x27;s answer to this
+is user environments, generations, and profiles.&lt;&#x2F;p&gt;
+&lt;p&gt;User environments hold symlinks to the installed packages. For instance,
+running &lt;code&gt;ls -l&lt;&#x2F;code&gt; on my currently active user environment shows something like&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#4&quot;&gt;4&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ ls -l &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-user-environment&#x2F;bin&#x2F;
+cabal -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-cabal-install-1.24.0.2&#x2F;bin&#x2F;cabal
+ghc-mod -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-ghc-mod-5.7.0.0&#x2F;bin&#x2F;ghc-mod
+ghc-modi -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-ghc-mod-5.7.0.0&#x2F;bin&#x2F;ghc-modi
+hakyll-init -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-hakyll-4.9.5.1&#x2F;bin&#x2F;hakyll-init
+nix-build -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-nix-1.11.7&#x2F;bin&#x2F;nix-build
+...
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Every time a package is installed, uninstalled, or updated, a new user
+environment is created with the corresponding symlinks created, removed,
+or modified.&lt;&#x2F;p&gt;
+&lt;p&gt;User environments are named with a hash followed by &lt;code&gt;-user-environment&lt;&#x2F;code&gt;,
+located alongside other packages in the Nix store. This becomes important
+when we look at how removing packages works.&lt;&#x2F;p&gt;
+&lt;p&gt;Symlinked to user environments are generations, located outside of the
+store (but still under &lt;code&gt;&#x2F;nix&lt;&#x2F;code&gt;) in &lt;code&gt;&#x2F;nix&#x2F;var&#x2F;nix&#x2F;profiles&lt;&#x2F;code&gt;. Running &lt;code&gt;ls -l&lt;&#x2F;code&gt;
+shows something like:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ ls -l &#x2F;nix&#x2F;var&#x2F;nix&#x2F;profiles&#x2F;
+default -&amp;gt; default-23-link
+default-20-link -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-user-environment
+default-21-link -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-user-environment
+default-22-link -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-user-environment
+default-23-link -&amp;gt; &#x2F;nix&#x2F;store&#x2F;&amp;lt;hash&amp;gt;-user-environment
+...
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Here the &lt;code&gt;default-N-link&lt;&#x2F;code&gt; symlinks are &lt;em&gt;generations&lt;&#x2F;em&gt; for the &lt;code&gt;default&lt;&#x2F;code&gt; &lt;em&gt;profile&lt;&#x2F;em&gt;.
+Whenever a user environment is created, a corresponding generation is created
+that points to it. The profile is then modified to point at this new generation.
+Since symlinking is an atomic operation, these series of symlinks allow Nix to
+perform atomic upgrades. If at any point during an install we decide to hit &lt;code&gt;Ctrl+C&lt;&#x2F;code&gt;,
+our profile is left untouched. The Nix store may contain dirty state leftover from
+the terminated install, but those will get handled if the install is retried or the garbage
+collector is run.&lt;&#x2F;p&gt;
+&lt;p&gt;We&#x27;re almost ready to get the packages on our &lt;code&gt;PATH&lt;&#x2F;code&gt;. In each user&#x27;s home
+directory there is a &lt;code&gt;~&#x2F;.nix-profile&lt;&#x2F;code&gt; symlink which points at their profile
+(different users may have different profiles). When Nix was installed,
+it added a statement in the user&#x27;s bash profile (e.g. &lt;code&gt;~&#x2F;.profile&lt;&#x2F;code&gt;) to
+source a script in this profile which chases the symlinks all the way down and
+adds the &lt;code&gt;bin&lt;&#x2F;code&gt; to the &lt;code&gt;PATH&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ cat ~&#x2F;.profile
+...
+
+if [ -e &#x2F;...&#x2F;.nix-profile&#x2F;etc&#x2F;profile.d&#x2F;nix.sh ]; then
+  . &#x2F;...&#x2F;.nix-profile&#x2F;etc&#x2F;profile.d&#x2F;nix.sh;
+fi
+
+...
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;h3 id=&quot;rollbacks&quot;&gt;Rollbacks&lt;&#x2F;h3&gt;
+&lt;p&gt;Because Nix does not do destructive updates, rollbacks are easy.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ nix-env --rollback
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;What is interesting is we can even rollback uninstalls. To Nix, this is
+no different than rolling back an install. Each install, uninstall, and
+update creates a new user environment with a new generation. A rollback
+simply changes the pointer to point at the previous generation.&lt;&#x2F;p&gt;
+&lt;p&gt;We can also rollback to a specific generation.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ nix-env --list-generations
+  20   2017-03-17 10:57:28
+  21   2017-03-21 21:44:18
+  22   2017-03-21 21:46:56
+  23   2017-03-26 12:23:13   (current)
+
+$ nix-env --switch-generation 22
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The numbers here correspond to the numbers in the symlinks.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;garbage-collection&quot;&gt;Garbage collection&lt;&#x2F;h3&gt;
+&lt;p&gt;Up to this point we&#x27;ve only seen Nix add packages to the store.
+Given our machines have limited disk space, at some point Nix needs
+to actually delete packages from the store.&lt;&#x2F;p&gt;
+&lt;p&gt;Nix does this via &lt;em&gt;garbage collection&lt;&#x2F;em&gt;, sharing the same name
+and purpose as the memory management mechanism. Where in programs
+garbage collection tracks object references, Nix tracks symlinks
+into the Nix store.&lt;&#x2F;p&gt;
+&lt;p&gt;Recall that generations are symlinks into user environments located
+in the store, which in turn are symlinks to packages. This means
+that so long as generations are never deleted, every package is
+reachable and ineligible for garbage collection (consider what
+happens if a package was garbage collected and we then switched
+to a generation that referenced that package).&lt;&#x2F;p&gt;
+&lt;p&gt;Therefore in order for packages to be removed, generations need to
+be deleted. Generation deletion is an explicit step done by the
+user - Nix will not delete generations by itself.&lt;&#x2F;p&gt;
+&lt;p&gt;One way to delete generations is by number.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ nix-env --delete-generations 20 21
+removing generation 20
+removing generation 21
+$ nix-env --list-generations
+  22   2017-03-21 21:46:56
+  23   2017-03-26 12:23:13   (current)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;To delete all old generations, we can use &lt;code&gt;nix-env --delete-generations old&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;Now we have some user environments, and by extension packages, with no
+references to them. We can see what these are by running
+&lt;code&gt;nix-store --gc --print-dead&lt;&#x2F;code&gt;. To run the garbage collector and delete
+them, we run &lt;code&gt;nix-store --gc&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;nix-the-language&quot;&gt;Nix the language&lt;&#x2F;h3&gt;
+&lt;p&gt;&amp;quot;Nix&amp;quot; refers to the package manager we&#x27;ve been discussing, but also to
+the related programming language. Packages in Nix are specified by
+expressions written in Nix the language. These expressions create &lt;em&gt;derivations&lt;&#x2F;em&gt;
+which tell Nix how to build a package.&lt;&#x2F;p&gt;
+&lt;p&gt;At this point I could write a tutorial on the Nix language, but it would just end up being an
+ad-hoc, informally-written, bug-ridden copy of the
+&lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;manual&#x2F;#chap-writing-nix-expressions&quot;&gt;Nix manual chapter on expressions&lt;&#x2F;a&gt; and
+&lt;a href=&quot;https:&#x2F;&#x2F;medium.com&#x2F;@MrJamesFisher&#x2F;nix-by-example-a0063a1a4c55&quot;&gt;Nix by example: The Nix expression language&lt;&#x2F;a&gt;&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#5&quot;&gt;5&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;. If you&#x27;re
+interested in learning about Nix the language, I would recommend reading those.&lt;&#x2F;p&gt;
+&lt;p&gt;I have also been told by several people that the &lt;a href=&quot;http:&#x2F;&#x2F;lethalman.blogspot.com&#x2F;2014&#x2F;07&#x2F;nix-pill-1-why-you-should-give-it-try.html&quot;&gt;Nix pill&lt;&#x2F;a&gt; series is
+very good. I&#x27;ve yet to read it myself, but it&#x27;s definitely on my to-read list.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;nixpkgs&quot;&gt;Nixpkgs&lt;&#x2F;h3&gt;
+&lt;p&gt;&lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nixpkgs&#x2F;&quot;&gt;Nixpkgs&lt;&#x2F;a&gt; is the primary way of installing packages through Nix. Nixpkgs
+is a repository of Nix expressions, each of which tell Nix how to build a package
+from source. For example, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;NixOS&#x2F;nixpkgs&#x2F;blob&#x2F;master&#x2F;pkgs&#x2F;applications&#x2F;misc&#x2F;hello&#x2F;default.nix&quot;&gt;here&lt;&#x2F;a&gt; is the Nix expression for building GNU Hello.&lt;&#x2F;p&gt;
+&lt;p&gt;Different operating systems will track Nixpkgs through different &lt;em&gt;channels&lt;&#x2F;em&gt;, which are
+essentially branches of the repository. I use Mac OS, so my Nix tracks the &amp;quot;unstable&amp;quot;
+channel which is the master branch after it passes through a periodically running
+CI.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;$ nix-channel --list
+nixpkgs https:&#x2F;&#x2F;nixos.org&#x2F;channels&#x2F;nixpkgs-unstable
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;While Nix derivations tell Nix how to build a package from source, this doesn&#x27;t mean we&#x27;re
+doomed to say, build Rust from source (which involves multiple bootstraps of the compiler).
+Whenever we ask Nix to install a package, it will first check an upstream cache for a
+previously built binary&lt;sup class=&quot;footnote-reference&quot;&gt;&lt;a href=&quot;#6&quot;&gt;6&lt;&#x2F;a&gt;&lt;&#x2F;sup&gt;. If the binary exists it is downloaded to the appropriate location
+and the install completes. It is only when the binary doesn&#x27;t exist that the system builds
+the package from source.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;freedom-to-explore&quot;&gt;Freedom to explore&lt;&#x2F;h2&gt;
+&lt;p&gt;The best part of Nix is that it gives us the freedom to explore.  With traditional
+package managers every install and upgrade is risky. With Nix these are guaranteed not to
+cause problems. If we install something and don&#x27;t like what we see, a rollback is just a
+command away. This enables us to discover, experiment, and play with new packages risk-free,
+a truly liberating feeling.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;further-reading&quot;&gt;Further reading&lt;&#x2F;h2&gt;
+&lt;p&gt;Here are some resources I found valuable when learning Nix.&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;manual&#x2F;&quot;&gt;Nix manual&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;begriffs.com&#x2F;posts&#x2F;2016-08-08-intro-to-nixos.html&quot;&gt;Purely Functional Linux with NixOS&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nixpkgs&#x2F;manual&#x2F;&quot;&gt;Nixpkgs manual&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;1&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;1&lt;&#x2F;sup&gt;
+&lt;p&gt;I know this isn&#x27;t entirely true due to files the program may
+keep in other places, but I didn&#x27;t know that at the time.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;2&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;2&lt;&#x2F;sup&gt;
+&lt;p&gt;When you &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;nix&#x2F;manual&#x2F;#chap-installation&quot;&gt;install Nix&lt;&#x2F;a&gt;, the installer places the Nix tools in the store
+as if it were installed by Nix itself. This bootstraps Nix to be managed by Nix,
+and makes it easy to opt out if you decide Nix isn&#x27;t for you (just destroy the
+Nix store).&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;3&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;3&lt;&#x2F;sup&gt;
+&lt;p&gt;This behavior matches exactly that of persistent data structures, and is safe for
+the same reasons.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;4&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;4&lt;&#x2F;sup&gt;
+&lt;p&gt;Here we see Nix tools like &lt;code&gt;nix-build&lt;&#x2F;code&gt; are installed alongside packages.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;5&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;5&lt;&#x2F;sup&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;Greenspun&amp;#x27;s_tenth_rule&quot;&gt;Greenspun&#x27;s tenth rule&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+&lt;div class=&quot;footnote-definition&quot; id=&quot;6&quot;&gt;&lt;sup class=&quot;footnote-definition-label&quot;&gt;6&lt;&#x2F;sup&gt;
+&lt;p&gt;These pre-built binaries are built by a central &lt;a href=&quot;http:&#x2F;&#x2F;nixos.org&#x2F;hydra&#x2F;&quot;&gt;Hydra&lt;&#x2F;a&gt; cluster.&lt;&#x2F;p&gt;
+&lt;&#x2F;div&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Hello</title>
+		<published>2017-03-27T00:00:00+00:00</published>
+		<updated>2017-03-27T00:00:00+00:00</updated>
+		<link href="https://www.adelbertc.com/hello/" type="text/html"/>
+		<id>https://www.adelbertc.com/hello/</id>
+		<content type="html">&lt;p&gt;I&#x27;ve decided to give blogging another go. This blog will serve primarily as
+a journal for me.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;
+&lt;p&gt;I expect many posts to be about the new things I learn. Writing about these
+will help solidify my understanding and hopefully help those learning as well.&lt;&#x2F;p&gt;
+</content>
+	</entry>
+</feed>
